@@ -79,27 +79,67 @@ class Simulator:
     #tratando os eventos do tipo EventType.ARRIVAL
     def __handle_arrival(self, event: Event):
         self.__current_timestamp = event.timestamp
+        
+        #agenda a próxima chegada na fila 1
+        def schedule_next_arrival():
+            next_arrival_time = self.__current_timestamp + self.__get_arrival_time()
+
+            if(next_arrival_time <= self.__system_max_arrival_time):
+                self.__enqueue_event(\
+                    Event(timestamp=next_arrival_time,\
+                        type=EventType.ARRIVAL, queue_number=1))
 
         if(event.queue_number == 1):
             if(self.__current_service == None):
-                self.__current_service = event
-
                 #agenda a saída do cliente atual da fila 1
                 self.__enqueue_event(\
                     Event(timestamp=self.__current_timestamp + self.__get_service_time(),\
                         type=EventType.DEPARTURE, queue_number=1, id=event.id))
 
-                next_arrival_time = self.__current_timestamp + self.__get_arrival_time()
+                schedule_next_arrival()
 
-                if(next_arrival_time <= self.__system_max_arrival_time):
-                    #agenda a próxima chegada na fila 1
-                    self.__enqueue_event(\
-                        Event(timestamp=next_arrival_time,\
-                            type=EventType.ARRIVAL, queue_number=1))
-            else:
+                self.__current_service = event
+            elif(self.__current_service.queue_number == 1):
                 self.__enqueue_event(\
                         Event(timestamp=self.__get_end_of_current_service(),\
                             type=EventType.ARRIVAL, queue_number=1, id=event.id))
+            else:
+                remaining_service_time = \
+                    self.__get_end_of_current_service() - self.__current_timestamp
+
+                self.__enqueue_event(\
+                    Event(timestamp=self.__current_timestamp,\
+                        type=EventType.ARRIVAL, queue_number=2,\
+                             id=self.__current_service.id,\
+                                 remaining_service_time=remaining_service_time))
+
+                #agenda a saída do cliente do evento atual da fila 1
+                self.__enqueue_event(\
+                    Event(timestamp=self.__current_timestamp + self.__get_service_time(),\
+                        type=EventType.DEPARTURE, queue_number=1, id=event.id))
+                
+                schedule_next_arrival()
+
+                self.__current_service = event
+        else:
+            if(self.__current_service == None):
+                service_time = None
+
+                if(event.remaining_service_time != None):
+                    service_time = event.remaining_service_time
+                else:
+                    service_time = self.__get_service_time()
+
+                #agenda a saída do cliente atual da fila 2
+                self.__enqueue_event(\
+                    Event(timestamp=self.__current_timestamp + service_time,\
+                        type=EventType.DEPARTURE, queue_number=2, id=event.id))
+
+                self.__current_service = event
+            else:
+                self.__enqueue_event(\
+                        Event(timestamp=self.__get_end_of_current_service(),\
+                            type=EventType.ARRIVAL, queue_number=2, id=event.id))
 
     def __handle_departure(self, event: Event):
         self.__current_timestamp = event.timestamp

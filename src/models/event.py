@@ -8,8 +8,10 @@ class Event:
     type: EventType
     timestamp: float
     queue_number: int
+    remaining_service_time: float
 
-    def __init__(self, type: EventType, timestamp: float, queue_number: int, id: str = ""):
+    def __init__(self, type: EventType, timestamp: float, queue_number: int, \
+        id: str = "", remaining_service_time: float = None):
         self.type = type
         self.timestamp = timestamp
         self.queue_number = queue_number
@@ -18,6 +20,11 @@ class Event:
             self.id = str(uuid.uuid4())
         else:
             self.id = id
+
+        if(remaining_service_time):
+            self.remaining_service_time = remaining_service_time
+        else:
+            self.remaining_service_time = None
 
     def __lt__(self, other):
         return self.timestamp < other.timestamp

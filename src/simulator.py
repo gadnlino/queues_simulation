@@ -148,7 +148,7 @@ class Simulator:
         if(event.queue_number == 1):
             #agenda a chegada do cliente atual na fila 2
             self.__enqueue_event(\
-                Event(timestamp=self.__current_timestamp + 1,\
+                Event(timestamp=self.__current_timestamp,\
                     type=EventType.ARRIVAL, queue_number=2, id=event.id))
 
     #executa passos da simulação

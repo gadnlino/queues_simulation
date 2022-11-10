@@ -5,17 +5,17 @@ import os
 
 import numpy as np
 
-from models.queue_event import QueueEvent
-from models.queue_event_type import QueueEventType
+from models.event import Event
+from models.event_type import EventType
 from models.service_event import ServiceEvent
 from models.service_event_type import ServiceEventType
 
 
 class Simulator:
     def __init__(self):
-        self.__q_events: list[QueueEvent] = []
+        self.__q_events: list[Event] = []
 
-        self.__q_events_history: list[QueueEvent] = []
+        self.__q_events_history: list[Event] = []
 
         self.__q_events_history_file = './q_events_history.json'
 
@@ -37,11 +37,11 @@ class Simulator:
         self.__current_service = None
 
     #insere um evento na fila de eventos
-    def __enqueue_event(self, event: QueueEvent):
+    def __enqueue_event(self, event: Event):
         bisect.insort(self.__q_events, event)
 
     #remove um evento na fila de eventos
-    def __dequeue_event(self) -> QueueEvent:
+    def __dequeue_event(self) -> Event:
         event = self.__q_events[0]
 
         #adicionando no histórico de eventos
@@ -84,14 +84,14 @@ class Simulator:
         #return np.random.uniform(low=0, high=1) > 1 - self.__utilization
 
     def __remove_current_service_departure(self):
-        departures_current_service = list(filter(lambda x: x.type == QueueEventType.DEPARTURE \
+        departures_current_service = list(filter(lambda x: x.type == EventType.DEPARTURE \
                         and x.client_id == self.__current_service.client_id
                         and x.queue_number == self.__current_service.queue_number, self.__q_events))
 
         self.__q_events.remove(departures_current_service[0])
 
     def __get_end_of_current_service(self):
-        departures_current_service = list(filter(lambda x: x.type == QueueEventType.DEPARTURE \
+        departures_current_service = list(filter(lambda x: x.type == EventType.DEPARTURE \
                         and x.client_id == self.__current_service.client_id
                         and x.queue_number == self.__current_service.queue_number, self.__q_events))
                         
@@ -102,7 +102,7 @@ class Simulator:
         return end_of_current_service
 
     #tratando os eventos do tipo EventType.ARRIVAL
-    def __handle_arrival(self, event: QueueEvent):
+    def __handle_arrival(self, event: Event):
         self.__current_timestamp = event.timestamp
         
         #agenda a próxima chegada na fila 1
@@ -111,8 +111,8 @@ class Simulator:
 
             if(next_arrival_time <= self.__system_max_arrival_time and self.__should_arrive()):
                 self.__enqueue_event(\
-                    QueueEvent(timestamp=next_arrival_time,\
-                        type=QueueEventType.ARRIVAL, queue_number=1))
+                    Event(timestamp=next_arrival_time,\
+                        type=EventType.ARRIVAL, queue_number=1))
 
         should_schedule_next_arrival = False
 
@@ -122,8 +122,8 @@ class Simulator:
                 
                 #agenda a saída do cliente atual da fila 1
                 self.__enqueue_event(\
-                    QueueEvent(timestamp=self.__current_timestamp + self.__get_service_time(),\
-                        type=QueueEventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
+                    Event(timestamp=self.__current_timestamp + self.__get_service_time(),\
+                        type=EventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
 
                 should_schedule_next_arrival = True
 
@@ -135,8 +135,8 @@ class Simulator:
                 print('caso 2')
                 
                 self.__enqueue_event(\
-                        QueueEvent(timestamp=self.__get_end_of_current_service(),\
-                            type=QueueEventType.ARRIVAL, queue_number=event.queue_number, client_id=event.client_id))
+                        Event(timestamp=self.__get_end_of_current_service(),\
+                            type=EventType.ARRIVAL, queue_number=event.queue_number, client_id=event.client_id))
             else:#serviço ocupado por alguem da fila 2, agendo uma nova chegada desse cliente para o final do serviço atual
                 print('caso 3')
                 end_of_current_service = self.__get_end_of_current_service()
@@ -153,15 +153,15 @@ class Simulator:
                 self.__remove_current_service_departure()
 
                 self.__enqueue_event(\
-                    QueueEvent(timestamp=end_of_current_service,\
-                        type=QueueEventType.ARRIVAL, queue_number=self.__current_service.queue_number,\
+                    Event(timestamp=end_of_current_service,\
+                        type=EventType.ARRIVAL, queue_number=self.__current_service.queue_number,\
                              client_id=self.__current_service.client_id,\
                                  remaining_service_time=remaining_service_time))
 
                 #agenda a saída do cliente do evento atual da fila 1
                 self.__enqueue_event(\
-                    QueueEvent(timestamp=self.__current_timestamp + self.__get_service_time(),\
-                        type=QueueEventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
+                    Event(timestamp=self.__current_timestamp + self.__get_service_time(),\
+                        type=EventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
                 
                 should_schedule_next_arrival = True
 
@@ -181,8 +181,8 @@ class Simulator:
 
                 #agenda a saída do cliente atual da fila 2
                 self.__enqueue_event(\
-                    QueueEvent(timestamp=self.__current_timestamp + service_time,\
-                        type=QueueEventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
+                    Event(timestamp=self.__current_timestamp + service_time,\
+                        type=EventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
 
                 self.__current_service = event
 
@@ -193,13 +193,13 @@ class Simulator:
                 print('caso 5')
                 
                 self.__enqueue_event(\
-                        QueueEvent(timestamp=self.__get_end_of_current_service(),\
-                            type=QueueEventType.ARRIVAL, queue_number=event.queue_number, client_id=event.client_id))
+                        Event(timestamp=self.__get_end_of_current_service(),\
+                            type=EventType.ARRIVAL, queue_number=event.queue_number, client_id=event.client_id))
 
         if(should_schedule_next_arrival):
             schedule_next_arrival()
 
-    def __handle_departure(self, event: QueueEvent):
+    def __handle_departure(self, event: Event):
         self.__current_timestamp = event.timestamp
 
         self.__service_events_history.append(
@@ -210,26 +210,26 @@ class Simulator:
         if(event.queue_number == 1):
             #agenda a chegada do cliente atual na fila 2
             self.__enqueue_event(\
-                QueueEvent(timestamp=self.__current_timestamp,\
-                    type=QueueEventType.ARRIVAL, queue_number=2, client_id=event.client_id))
+                Event(timestamp=self.__current_timestamp,\
+                    type=EventType.ARRIVAL, queue_number=2, client_id=event.client_id))
 
     #executa passos da simulação
     def run(self):
         #enfileirando a primeira chegada na fila 1
         self.__enqueue_event(\
-            QueueEvent(\
+            Event(\
                 timestamp=self.__current_timestamp + self.__get_arrival_time(), \
-                    type=QueueEventType.ARRIVAL, queue_number=1))
+                    type=EventType.ARRIVAL, queue_number=1))
         
         try:
             while(len(self.__q_events) > 0):
-                event: QueueEvent = self.__dequeue_event()
+                event: Event = self.__dequeue_event()
 
                 print(event.timestamp)
 
-                if(event.type == QueueEventType.ARRIVAL):
+                if(event.type == EventType.ARRIVAL):
                     self.__handle_arrival(event)
-                elif (event.type == QueueEventType.DEPARTURE):
+                elif (event.type == EventType.DEPARTURE):
                     self.__handle_departure(event)
         finally:
             if(os.path.exists(self.__q_events_history_file)):

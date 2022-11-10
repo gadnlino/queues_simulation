@@ -1,20 +1,20 @@
 from dataclasses import dataclass
 from itertools import count
 
-from models.queue_event_type import QueueEventType, event_type_values
+from models.event_type import EventType
 
 
 @dataclass
-class QueueEvent:
+class Event:
     client_id: str
-    type: QueueEventType
+    type: EventType
     timestamp: float
     queue_number: int
     remaining_service_time: float
 
     id_counter = count(start=1)
 
-    def __init__(self, type: QueueEventType, timestamp: float, queue_number: int, \
+    def __init__(self, type: EventType, timestamp: float, queue_number: int, \
         client_id: int = None, remaining_service_time: float = None):
         self.type = type
         self.timestamp = timestamp

@@ -1,7 +1,0 @@
-from enum import Enum
-
-
-class ServiceEventType(Enum):
-    SERVICE_STARTED = "SERVICE_STARTED"
-    SERVICE_HALTED = "SERVICE_HALTED"
-    SERVICE_FINISHED = "SERVICE_FINISHED"

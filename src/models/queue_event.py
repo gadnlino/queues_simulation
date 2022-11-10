@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-#import uuid
-from models.queue_event_type import QueueEventType, event_type_values
 from itertools import count
 
+from models.queue_event_type import QueueEventType, event_type_values
+
+
 @dataclass
-class Event:
+class QueueEvent:
     client_id: str
     type: QueueEventType
     timestamp: float

@@ -33,15 +33,21 @@ class Event:
     #1) menor tempo primeiro
     #2) Partidas antes de chegadas
     #3) Fila 1 antes do que a fila 2
+    # def __lt__(self, other):
+    #     return self.timestamp < other.timestamp or\
+    #          event_type_values[self.type] < event_type_values[other.type] or \
+    #             self.queue_number < other.queue_number
+
     def __lt__(self, other):
-        return self.timestamp < other.timestamp or\
-             event_type_values[self.type] < event_type_values[other.type] or \
-                self.queue_number < other.queue_number
+        return self.timestamp < other.timestamp
     
+    # def __le__(self, other):
+    #     return self.timestamp <= other.timestamp or\
+    #          event_type_values[self.type] < event_type_values[other.type] or\
+    #              self.queue_number < other.queue_number
+
     def __le__(self, other):
-        return self.timestamp <= other.timestamp or\
-             event_type_values[self.type] < event_type_values[other.type] or\
-                 self.queue_number < other.queue_number
+        return self.timestamp <= other.timestamp
     
     def as_dict(self):
         return {

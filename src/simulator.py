@@ -4,6 +4,7 @@ from models.queue_event_type import QueueEventType
 import heapq
 import os
 import numpy as np
+import bisect
 
 class Simulator:
     def __init__(self):
@@ -18,7 +19,7 @@ class Simulator:
         self.__service_time_rate = 1
 
         #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento da loja)
-        self.__system_max_arrival_time = 10
+        self.__system_max_arrival_time = 10000
 
         self.__current_timestamp = 0.0
 
@@ -28,14 +29,19 @@ class Simulator:
 
     #insere um evento na fila de eventos
     def __enqueue_event(self, event: Event):
-        heapq.heappush(self.__event_queue, event)
+        #heapq.heappush(self.__event_queue, event)
+        bisect.insort(self.__event_queue, event)
 
     #remove um evento na fila de eventos
     def __dequeue_event(self) -> Event:
-        event = heapq.heappop(self.__event_queue)
+        #event = heapq.heappop(self.__event_queue)
+
+        event = self.__event_queue[0]
 
         #adicionando no histórico de eventos
         self.__event_history.append(event)
+
+        self.__event_queue.pop(0)
 
         return event
 

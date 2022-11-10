@@ -23,18 +23,18 @@ class Simulator:
 
         self.__service_events_history_file = './service_events_history.json'
 
-        self.__arrival_interval_time_rate = 1
-        
-        self.__service_time_rate = 1
+        self.__utilization_pct = 0.2
 
         #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento da loja)
         self.__system_max_arrival_time = 10
+        
+        self.__service_rate = 1
+
+        self.__arrival_rate = 1/(self.__utilization_pct * self.__service_rate)
 
         self.__current_timestamp = 0.0
 
         self.__current_service = None
-
-        self.__utilization = 0.2
 
     #insere um evento na fila de eventos
     def __enqueue_event(self, event: QueueEvent):
@@ -72,11 +72,11 @@ class Simulator:
 
     #get an arrival time, given the poisson distribution(exponential inter arrivals)
     def __get_arrival_time(self):
-        return np.random.exponential(scale=self.__arrival_interval_time_rate) 
+        return np.random.exponential(scale=1.0/self.__arrival_rate) 
     
     #get an service time, given the exponential distribution
     def __get_service_time(self):
-        return np.random.exponential(scale=self.__service_time_rate)
+        return np.random.exponential(scale=1.0/self.__service_rate)
 
     #determine if and arrive should occur, based on a utilization factor
     def __should_arrive(self):

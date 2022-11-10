@@ -1,40 +1,51 @@
 from dataclasses import dataclass
-import uuid
-from models.event_type import EventType
+#import uuid
+from models.queue_event_type import QueueEventType, event_type_values
+from itertools import count
 
 @dataclass
 class Event:
-    id: str
-    type: EventType
+    client_id: str
+    type: QueueEventType
     timestamp: float
     queue_number: int
     remaining_service_time: float
 
-    def __init__(self, type: EventType, timestamp: float, queue_number: int, \
-        id: str = "", remaining_service_time: float = None):
+    id_counter = count(start=1)
+
+    def __init__(self, type: QueueEventType, timestamp: float, queue_number: int, \
+        client_id: int = None, remaining_service_time: float = None):
         self.type = type
         self.timestamp = timestamp
         self.queue_number = queue_number
 
-        if(not(id)):
-            self.id = str(uuid.uuid4())
+        if(not(client_id)):
+            self.client_id = next(self.id_counter)
         else:
-            self.id = id
+            self.client_id = client_id
 
         if(remaining_service_time):
             self.remaining_service_time = remaining_service_time
         else:
             self.remaining_service_time = None
-
+    
+    #Critérios
+    #1) menor tempo primeiro
+    #2) Partidas antes de chegadas
+    #3) Fila 1 antes do que a fila 2
     def __lt__(self, other):
-        return self.timestamp < other.timestamp
+        return self.timestamp < other.timestamp or\
+             event_type_values[self.type] < event_type_values[other.type] or \
+                self.queue_number < other.queue_number
     
     def __le__(self, other):
-        return self.timestamp <= other.timestamp
+        return self.timestamp <= other.timestamp or\
+             event_type_values[self.type] < event_type_values[other.type] or\
+                 self.queue_number < other.queue_number
     
     def as_dict(self):
         return {
-            'id': self.id,
+            'client_id': self.client_id,
             'type': str(self.type),
             'timestamp': self.timestamp,
             'queue_number': self.queue_number

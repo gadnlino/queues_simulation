@@ -7,9 +7,6 @@ import numpy as np
 
 from models.event import Event
 from models.event_type import EventType
-from models.service_event import ServiceEvent
-from models.service_event_type import ServiceEventType
-
 
 class Simulator:
     def __init__(self):

@@ -19,7 +19,7 @@ class Simulator:
 
         self.__number_of_qs = 2
 
-        self.__utilization_pct = 0.99
+        self.__utilization_pct = 0.20
 
         #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento da loja)
         self.__system_max_arrival_time = 1000
@@ -29,7 +29,7 @@ class Simulator:
         self.__arrival_rate = 1 / (self.__utilization_pct *
                                    self.__service_rate)
 
-        self.__number_of_rounds = 3
+        self.__number_of_rounds = 1
 
         self.__current_round = 0
     

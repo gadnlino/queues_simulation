@@ -130,4 +130,3 @@ dmypy.json
 event_history.json
 *.json
 *.csv
-*.png

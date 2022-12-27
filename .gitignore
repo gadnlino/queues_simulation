@@ -130,3 +130,4 @@ dmypy.json
 event_history.json
 *.json
 *.csv
+queue_sizes.png

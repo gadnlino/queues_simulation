@@ -9,33 +9,31 @@ import numpy as np
 from models.event import Event
 from models.event_type import EventType
 
-
 class Simulator:
 
     def __init__(self):
-        self.__event_list_raw_file = './event_list_raw.csv'
+        self.__event_list_raw_file: str = './event_list_raw.csv'
 
         self.__event_list_raw = []
 
-        self.__number_of_qs = 2
+        self.__number_of_qs: int = 2
 
-        self.__utilization_pct = 0.20
+        self.__utilization_pct: float = 0.99
 
-        #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento da loja)
-        self.__system_max_arrival_time = 1000
+        #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento)
+        self.__system_max_arrival_time: float = 1000
 
-        self.__service_rate = 1
+        self.__service_rate: float = 1
 
-        self.__arrival_rate = 1 / (self.__utilization_pct *
+        #taxa de chegada
+        self.__arrival_rate: float = (self.__utilization_pct *
                                    self.__service_rate)
 
-        self.__number_of_rounds = 1
+        self.__number_of_rounds: int = 5
 
-        self.__current_round = 0
+        self.__current_round : int = 0
     
     def __reset_simulation_variables(self):
-        #simulation variables
-
         self.__current_timestamp = 0.0
 
         self.__current_service = None

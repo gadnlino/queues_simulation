@@ -71,4 +71,4 @@ if __name__ == "__main__":
     for i in range(0, 200):
         #exemplo do livro do Knuth
         #https://books.google.com.br/books?id=Zu-HAwAAQBAJ&pg=PT4&redir_esc=y#v=onepage&q&f=false
-        print(prng.exponential(1))
+        print(prng.exponential(0.5))

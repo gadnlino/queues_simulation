@@ -8,6 +8,8 @@ import numpy as np
 
 from models.event import Event
 from models.event_type import EventType
+from models.metric import Metric
+from models.metric_type import MetricType
 
 
 class Simulator:
@@ -41,6 +43,23 @@ class Simulator:
         #rodada atual
         self.__current_round: int = 0
 
+        self.__metrics_accumulated = {
+            str(MetricType.W1): 0,
+            str(MetricType.W2): 0,
+            str(MetricType.X1): 0,
+            str(MetricType.X2): 0,
+            str(MetricType.T1): 0,
+            str(MetricType.T2): 0,
+            str(MetricType.NQ1): 0,
+            str(MetricType.NQ2): 0,
+            str(MetricType.N1): 0,
+            str(MetricType.N2): 0
+        }
+
+        self.__events_current_round: list[Event] = []
+
+        self.__metrics_current_round: list[Metric] = []
+
     def __reset_simulation_variables(self):
         """Reseta variáveis de controle para seus valores iniciais."""
 
@@ -56,6 +75,168 @@ class Simulator:
         self.__waiting_qs = list(
             map(lambda _: list(), range(0, self.__number_of_qs)))
 
+        self.__events_current_round: list[Event] = []
+
+        self.__metrics_current_round: list[Metric] = []
+
+    def __generate_metrics(self, metric_list: 'list[MetricType]'):
+
+        for m in metric_list:
+
+            metric = None
+
+            if (m == MetricType.W1):
+                queue_number = 1
+                client_id, current_event = self.__get_current_service()
+                client_arrival = list(
+                    filter(
+                        lambda x: x.type == EventType.ARRIVAL and x.client_id
+                        == client_id, self.__events_current_round))
+                value = self.__current_timestamp - client_arrival[0].timestamp
+                metric = Metric(MetricType.W1, value, self.__current_timestamp,
+                                queue_number, client_id)
+            elif (m == MetricType.X1):
+                queue_number = 1
+                end_service_1 = list(
+                    filter(lambda x: x.type == EventType.END_SERVICE_1,
+                           self.__events_current_round))
+                end_service_1.sort(key=lambda x: x.timestamp, reverse=True)
+                last_end_service_1 = end_service_1[0]
+                start_service_1 = list(
+                    filter(
+                        lambda x: x.type == EventType.START_SERVICE_1 and x.
+                        client_id == last_end_service_1.client_id,
+                        self.__events_current_round))[0]
+                value = (last_end_service_1.timestamp -
+                         start_service_1.timestamp)
+                metric = Metric(MetricType.X1, value, self.__current_timestamp,
+                                queue_number, last_end_service_1.client_id)
+            elif (m == MetricType.T1):
+                queue_number = 1
+                end_service_1 = list(
+                    filter(lambda x: x.type == EventType.END_SERVICE_1,
+                           self.__events_current_round))
+                end_service_1.sort(key=lambda x: x.timestamp, reverse=True)
+                last_client = end_service_1[0].client_id
+
+                w1 = list(
+                    filter(
+                        lambda x: x.type == MetricType.W1 and x.client_id ==
+                        last_client, self.__metrics_current_round))[0].value
+                x1 = list(
+                    filter(
+                        lambda x: x.type == MetricType.X1 and x.client_id ==
+                        last_client, self.__metrics_current_round))[0].value
+
+                value = w1 + x1
+                metric = Metric(MetricType.T1, value, self.__current_timestamp,
+                                queue_number, last_client)
+            elif (m == MetricType.NQ1):
+                queue_number = 1
+                value = self.__get_waiting_q_size(queue_number)
+                metric = Metric(MetricType.NQ1, value,
+                                self.__current_timestamp, queue_number)
+            elif (m == MetricType.N1):
+                queue_number = 1
+                value = self.__get_waiting_q_size(queue_number)
+
+                _, current_event = self.__get_current_service()
+
+                if (current_event == EventType.START_SERVICE_1):
+                    value = value + 1
+
+                metric = Metric(MetricType.NQ1, value,
+                                self.__current_timestamp, queue_number)
+            elif (m == MetricType.W2):
+                queue_number = 2
+                departures = list(
+                    filter(lambda x: x.type == EventType.DEPARTURE,
+                           self.__events_current_round))
+                departures.sort(key=lambda x: x.timestamp, reverse=True)
+                last_departed_client = departures[0].client_id
+
+                events_last_departed_client = list(
+                    filter(
+                        lambda x: x.client_id == last_departed_client and x.
+                        type in [
+                            EventType.END_SERVICE_1,
+                            EventType.START_SERVICE_2, EventType.
+                            HALT_SERVICE_2, EventType.DEPARTURE
+                        ], self.__events_current_round))
+                events_last_departed_client.sort(key=lambda x: x.timestamp)
+                
+                value = 0
+
+                for i in range(0, len(events_last_departed_client)):
+                    if(events_last_departed_client[i].type in [EventType.START_SERVICE_2]):
+                        idle_interval = events_last_departed_client[i].timestamp - events_last_departed_client[i-1].timestamp
+                        value = value + idle_interval
+                
+                metric = Metric(MetricType.W2, value,
+                                self.__current_timestamp, queue_number, last_departed_client)
+            elif (m == MetricType.X2):
+                queue_number = 2
+                departures = list(
+                    filter(lambda x: x.type == EventType.DEPARTURE,
+                           self.__events_current_round))
+                departures.sort(key=lambda x: x.timestamp, reverse=True)
+                last_departed_client = departures[0].client_id
+
+                events_last_departed_client = list(
+                    filter(
+                        lambda x: x.client_id == last_departed_client and x.
+                        type in [
+                            EventType.START_SERVICE_2, EventType.
+                            HALT_SERVICE_2, EventType.DEPARTURE
+                        ], self.__events_current_round))
+                events_last_departed_client.sort(key=lambda x: x.timestamp)
+                
+                value = 0
+
+                for i in range(0, len(events_last_departed_client)):
+                    if(events_last_departed_client[i].type in [EventType.HALT_SERVICE_2, EventType.DEPARTURE]):
+                        idle_interval = events_last_departed_client[i].timestamp - events_last_departed_client[i-1].timestamp
+                        value = value + idle_interval
+                
+                metric = Metric(MetricType.X2, value,
+                                self.__current_timestamp, queue_number, last_departed_client)
+            elif (m == MetricType.T2):
+                queue_number = 2
+                departures = list(
+                    filter(lambda x: x.type == EventType.DEPARTURE,
+                           self.__events_current_round))
+                departures.sort(key=lambda x: x.timestamp, reverse=True)
+                last_departure = departures[0]
+
+                end_service_1 = list(
+                    filter(
+                        lambda x: x.type == EventType.END_SERVICE_1 and x.
+                        client_id == last_departure.client_id,
+                        self.__events_current_round))[0]
+
+                value = last_departure.timestamp - end_service_1.timestamp
+                metric = Metric(MetricType.T2, value, self.__current_timestamp,
+                                queue_number, last_departure.client_id)
+            elif (m == MetricType.NQ2):
+                queue_number = 2
+                value = self.__get_waiting_q_size(queue_number)
+                metric = Metric(MetricType.NQ2, value,
+                                self.__current_timestamp, queue_number)
+            elif (m == MetricType.N2):
+                queue_number = 2
+                value = self.__get_waiting_q_size(queue_number)
+
+                _, current_event = self.__get_current_service()
+
+                if (current_event == EventType.START_SERVICE_2):
+                    value = value + 1
+
+                metric = Metric(MetricType.NQ1, value,
+                                self.__current_timestamp, queue_number)
+
+            if (metric != None):
+                self.__metrics_current_round.append(metric)
+
     def __get_arrival_time(self):
         """Obtém o tempo de chegada de um novo cliente, a partir de uma distribuição exponencial com taxa self.__arrival_rate.
 
@@ -63,7 +244,7 @@ class Simulator:
         ----------
         time: float
             Uma amostra de uma variável exponencial, representando um tempo de chegada."""
-        
+
         return np.random.exponential(scale=1.0 / self.__arrival_rate)
 
     def __get_service_time(self):
@@ -100,11 +281,13 @@ class Simulator:
             O evento na primeira posição da lista."""
         event = self.__event_q.pop(0)
 
+        self.__events_current_round.append(event)
+
         self.__event_list_raw.append({
             'reference':
             'event',
-            **event.as_dict(), 
-            'round': self.__current_round
+            **event.as_dict(), 'round':
+            self.__current_round
         })
 
         return event
@@ -252,7 +435,7 @@ class Simulator:
             O id do cliente servido.
         source_event_type:EventType
             O tipo do evento que originou o serviço corrente."""
-        
+
         self.__current_service = (client_id, source_event_type)
 
     def __schedule_next_arrival(self):
@@ -272,7 +455,8 @@ class Simulator:
         """Trata o evento do tipo EventType.ARRIVAL.\n
         Se não há serviço corrente, o cliente recém chegado inicia imediatamente o seu serviço(EventType.START_SERVICE_1).\n
         Se o serviço corrente é oriundo da fila de espera 1, o cliente é inserido na fila de espera 1.\n
-        Caso o serviço corrente seja oriundo da fila de espera 2, o serviço desse cliente é interrompido(EventType.HALT_SERVICE_2), e o cliente recém chegado inicia o serviço imediatamente."""
+        Caso o serviço corrente seja oriundo da fila de espera 2, o serviço desse cliente é interrompido(EventType.HALT_SERVICE_2), 
+        e o cliente recém chegado inicia o serviço imediatamente."""
 
         current_client_id, current_source_event_type = self.__get_current_service(
         )
@@ -309,6 +493,7 @@ class Simulator:
                 self.__enqueue_event(halt_service, True)
 
         self.__schedule_next_arrival()
+        self.__generate_metrics([MetricType.NQ1])
 
     def __handle_start_service_1(self, event: Event):
         """Trata o evento do tipo EventType.START_SERVICE_1.\n
@@ -325,6 +510,8 @@ class Simulator:
                   type=EventType.END_SERVICE_1,
                   queue_number=1,
                   client_id=event.client_id))
+
+        self.__generate_metrics([MetricType.NQ1, MetricType.N1, MetricType.W1])
 
     def __handle_end_service_1(self, event: Event):
         """Trata o evento do tipo EventType.END_SERVICE_1.\n
@@ -361,6 +548,8 @@ class Simulator:
 
             self.__enqueue_event(next_event, True)
 
+        self.__generate_metrics([MetricType.X1, MetricType.T1])
+
     def __handle_start_service_2(self, event: Event):
         """Trata o evento do tipo EventType.START_SERVICE_2.\n
         O cliente é removido da fila de espera 2.\n
@@ -386,6 +575,8 @@ class Simulator:
                       queue_number=2,
                       client_id=event.client_id))
 
+        self.__generate_metrics([MetricType.NQ2, MetricType.N2])
+
     def __handle_halt_service_2(self, event: Event):
         """Trata o evento do tipo EventType.HALT_SERVICE_2.\n
         O evento de saída do sistema do cliente atual é removido da fila de eventos, e o cliente é enfileirado na primeira posição da fila 2."""
@@ -407,6 +598,8 @@ class Simulator:
             remaining_service_time=remaining_service_time)
 
         self.__set_current_service(None, None)
+
+        self.__generate_metrics([MetricType.NQ2])
 
     def __handle_departure(self, event: Event):
         """Trata o evento do tipo EventType.DEPARTURE.\n
@@ -432,6 +625,8 @@ class Simulator:
             self.__enqueue_event(next_event, in_the_front=True)
 
         self.__current_service = None
+
+        self.__generate_metrics([MetricType.W2, MetricType.X2, MetricType.T2])
 
     def __save_event_list_raw(self):
         """Salva o evento no log de eventos."""
@@ -461,6 +656,7 @@ class Simulator:
 
         try:
             for round_number in range(0, self.__number_of_rounds):
+                #print(self.__metrics_accumulated)
                 self.__reset_simulation_variables()
 
                 #enfileirando a primeira chegada na fila 1
@@ -477,7 +673,7 @@ class Simulator:
 
                     self.__current_timestamp = event.timestamp
 
-                    print(event)
+                    #print(event)
 
                     if (event.type == EventType.ARRIVAL):
                         self.__handle_arrival(event)
@@ -491,5 +687,6 @@ class Simulator:
                         self.__handle_halt_service_2(event)
                     elif (event.type == EventType.DEPARTURE):
                         self.__handle_departure(event)
+                
         finally:
             self.__save_event_list_raw()

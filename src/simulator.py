@@ -15,7 +15,16 @@ from datetime import datetime
 
 class Simulator:
 
-    def __init__(self):
+    def __init__(self,
+                 utilization_pct: float,
+                 service_rate: float,
+                 number_of_rounds: int,
+                 round_size: int,
+                 save_metric_per_round_file: bool = True,
+                 save_raw_event_log_file: bool = False):
+        self.__opt_save_metric_per_round_file = save_metric_per_round_file
+        self.__opt_save_raw_event_log_file = save_raw_event_log_file
+
         #arquivo onde o log de eventos da simulação serão salvos
         self.__event_log_raw_file: str = './event_log_raw.csv'
 
@@ -26,20 +35,23 @@ class Simulator:
         self.__number_of_qs: int = 2
 
         #taxa de utilização(rho)
-        self.__utilization_pct: float = 0.99
+        self.__utilization_pct: float = utilization_pct
 
         #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento)
         self.__system_max_arrival_time: float = 1000
 
         #taxa de serviço(definido no enunciado do trabalho)
-        self.__service_rate: float = 1
+        self.__service_rate: float = service_rate
 
         #taxa de chegada(é obtida a partir das taxas de serviço e utilização, pela formula utilization_pct = (arrival_rate/service_rate))
         self.__arrival_rate: float = (self.__utilization_pct *
                                       self.__service_rate)
 
         #número de rodadas da simulação
-        self.__number_of_rounds: int = 5
+        self.__number_of_rounds: int = number_of_rounds
+
+        #número de rodadas da simulação
+        self.__round_size: int = round_size
 
         #rodada atual
         self.__current_round: int = 0
@@ -68,6 +80,8 @@ class Simulator:
         self.__events_current_round: list[Event] = []
 
         self.__metric_samples_current_round: list[Metric] = []
+
+        self.__served_clients = 0
 
     def __get_estimated_mean_and_std(self, samples: 'list[float]'):
         est_mean = sum(samples) / len(samples)
@@ -313,49 +327,30 @@ class Simulator:
                            self.__metric_samples_current_round))))
 
         current_round_metrics = {
-            str(MetricType.W1): {
-                'mean': w1_est_mean,
-                'variance': w1_est_var
-            },
-            str(MetricType.W2): {
-                'mean': w2_est_mean,
-                'variance': w2_est_var
-            },
-            str(MetricType.X1): {
-                'mean': x1_est_mean,
-                'variance': x1_est_var
-            },
-            str(MetricType.X2): {
-                'mean': x2_est_mean,
-                'variance': x2_est_var
-            },
-            str(MetricType.T1): {
-                'mean': t1_est_mean,
-                'variance': t1_est_var
-            },
-            str(MetricType.T2): {
-                'mean': t2_est_mean,
-                'variance': t2_est_var
-            },
-            str(MetricType.NQ1): {
-                'mean': nq1_est_mean,
-                'variance': nq1_est_var
-            },
-            str(MetricType.NQ2): {
-                'mean': nq2_est_mean,
-                'variance': nq2_est_var
-            },
-            str(MetricType.N1): {
-                'mean': n1_est_mean,
-                'variance': n1_est_var
-            },
-            str(MetricType.N2): {
-                'mean': n2_est_mean,
-                'variance': n2_est_var
-            },
+            'round': self.__current_round,
+            f'{str(MetricType.W1)}_est_mean': w1_est_mean,
+            f'{str(MetricType.W1)}_est_var': w1_est_var,
+            f'{str(MetricType.W2)}_est_mean': w2_est_mean,
+            f'{str(MetricType.W2)}_est_var': w2_est_var,
+            f'{str(MetricType.X1)}_est_mean': x1_est_mean,
+            f'{str(MetricType.X1)}_est_var': x1_est_var,
+            f'{str(MetricType.X2)}_est_mean': x2_est_mean,
+            f'{str(MetricType.X2)}_est_var': x2_est_var,
+            f'{str(MetricType.T1)}_est_mean': t1_est_mean,
+            f'{str(MetricType.T1)}_est_var': t1_est_var,
+            f'{str(MetricType.T2)}_est_mean': t2_est_mean,
+            f'{str(MetricType.T2)}_est_var': t2_est_var,
+            f'{str(MetricType.NQ1)}_est_mean': nq1_est_mean,
+            f'{str(MetricType.NQ1)}_est_var': nq1_est_var,
+            f'{str(MetricType.NQ2)}_est_mean': nq2_est_mean,
+            f'{str(MetricType.NQ2)}_est_var': nq2_est_var,
+            f'{str(MetricType.N1)}_est_mean': n1_est_mean,
+            f'{str(MetricType.N1)}_est_var': n1_est_var,
+            f'{str(MetricType.N2)}_est_mean': n2_est_mean,
+            f'{str(MetricType.N2)}_est_var': n2_est_var,
         }
 
-        print(current_round_metrics)
+        #print(current_round_metrics)
 
         self.__metrics_per_round.append(current_round_metrics)
 
@@ -405,7 +400,7 @@ class Simulator:
 
         self.__events_current_round.append(event)
 
-        if (self.__save_raw_event_log_file):
+        if (self.__opt_save_raw_event_log_file):
             self.__event_log_raw.append({
                 'reference':
                 'event',
@@ -430,7 +425,7 @@ class Simulator:
             O id do cliente na primeira posição da fila."""
 
         next_client = self.__waiting_qs[queue_number - 1].pop(0)
-        if (self.__save_raw_event_log_file):
+        if (self.__opt_save_raw_event_log_file):
             self.__event_log_raw.append({
                 'reference':
                 'dequeue',
@@ -465,7 +460,7 @@ class Simulator:
             O tempo de serviço restante do serviço interrrompido do cliente.
         in_the_front : bool, optional
             Caso True, insere o cliente na primeira posição da fila."""
-        if (self.__save_raw_event_log_file):
+        if (self.__opt_save_raw_event_log_file):
             self.__event_log_raw.append({
                 'reference': 'enqueue',
                 'queue_number': queue_number,
@@ -571,10 +566,10 @@ class Simulator:
         """Agenda a próxima chegada de um cliente ao sistema.\n
         O tempo de chegada do próximo cliente é determinado pela função self.__get_arrival_time."""
 
-        next_arrival_time = \
-            self.__current_timestamp + self.__get_arrival_time()
+        if (self.__served_clients <= self.__round_size):
+            next_arrival_time = self.__current_timestamp + self.__get_arrival_time(
+            )
 
-        if (next_arrival_time <= self.__system_max_arrival_time):
             self.__enqueue_event(
                 Event(timestamp=next_arrival_time,
                       type=EventType.ARRIVAL,
@@ -586,6 +581,8 @@ class Simulator:
         Se o serviço corrente é oriundo da fila de espera 1, o cliente é inserido na fila de espera 1.\n
         Caso o serviço corrente seja oriundo da fila de espera 2, o serviço desse cliente é interrompido(EventType.HALT_SERVICE_2), 
         e o cliente recém chegado inicia o serviço imediatamente."""
+
+        #print(f'Served clients: {self.__served_clients}')
 
         current_client_id, current_source_event_type = self.__get_current_service(
         )
@@ -599,7 +596,6 @@ class Simulator:
             self.__enqueue_in_waiting_q(event.client_id, 1)
             self.__enqueue_event(next_client, True)
         elif (current_source_event_type == EventType.START_SERVICE_1):
-            #enfileira cliente na fila 1
             self.__enqueue_in_waiting_q(event.client_id, 1)
         else:
             self.__enqueue_in_waiting_q(event.client_id, 1)
@@ -620,6 +616,8 @@ class Simulator:
                                      client_id=current_client_id)
 
                 self.__enqueue_event(halt_service, True)
+
+        self.__served_clients = self.__served_clients + 1
 
         self.__schedule_next_arrival()
 
@@ -760,8 +758,8 @@ class Simulator:
         self.__generate_metric_samples(
             [MetricType.W2, MetricType.X2, MetricType.T2])
 
-    def __save_event_logs_raw(self):
-        """Salva o evento no log de eventos."""
+    def __save_event_logs_raw_file(self):
+        """Salva o log de eventos em um arquivo .csv."""
 
         if (os.path.exists(self.__event_log_raw_file)):
             os.remove(self.__event_log_raw_file)
@@ -781,12 +779,52 @@ class Simulator:
                 dict_writer.writeheader()
                 dict_writer.writerows(self.__event_log_raw)
 
-    def run(self, save_raw_event_log_file=False):
+    def __save_metric_per_round_file(self):
+        """Salva as métricas por rodada em um arquivo .csv."""
+
+        file_name = f'metric_per_round_{datetime.utcnow().timestamp()}.csv'
+
+        if (os.path.exists(file_name)):
+            os.remove(file_name)
+
+        if (len(self.__metrics_per_round) > 0):
+            with open(file_name, 'a+', newline='') as output_file:
+
+                fieldnames = [
+                    'round',
+                    f'{str(MetricType.W1)}_est_mean',
+                    f'{str(MetricType.W1)}_est_var',
+                    f'{str(MetricType.W2)}_est_mean',
+                    f'{str(MetricType.W2)}_est_var',
+                    f'{str(MetricType.X1)}_est_mean',
+                    f'{str(MetricType.X1)}_est_var',
+                    f'{str(MetricType.X2)}_est_mean',
+                    f'{str(MetricType.X2)}_est_var',
+                    f'{str(MetricType.T1)}_est_mean',
+                    f'{str(MetricType.T1)}_est_var',
+                    f'{str(MetricType.T2)}_est_mean',
+                    f'{str(MetricType.T2)}_est_var',
+                    f'{str(MetricType.NQ1)}_est_mean',
+                    f'{str(MetricType.NQ1)}_est_var',
+                    f'{str(MetricType.NQ2)}_est_mean',
+                    f'{str(MetricType.NQ2)}_est_var',
+                    f'{str(MetricType.N1)}_est_mean',
+                    f'{str(MetricType.N1)}_est_var',
+                    f'{str(MetricType.N2)}_est_mean',
+                    f'{str(MetricType.N2)}_est_var',
+                ]
+
+                dict_writer = csv.DictWriter(output_file,
+                                             fieldnames=fieldnames)
+                dict_writer.writeheader()
+                dict_writer.writerows(self.__metrics_per_round)
+
+                print(f'Metric per round file saved at {file_name}')
+
+    def run(self):
         """Loop principal do simulador.\n
         Remove-se o evento na primeira posição da lista de eventos, e delega-se para a função de tratamento adequada.
         Ao final da execução de todas as rodadas, salva o log de eventos no arquivo .csv"""
-        self.__save_raw_event_log_file = save_raw_event_log_file
-
         start_time = datetime.utcnow().timestamp()
 
         try:
@@ -829,5 +867,8 @@ class Simulator:
 
             print(f'Tempo total de simulação: {simulation_time} s')
 
-            if (self.__save_raw_event_log_file):
-                self.__save_event_logs_raw()
+            if (self.__opt_save_metric_per_round_file):
+                self.__save_metric_per_round_file()
+
+            if (self.__opt_save_raw_event_log_file):
+                self.__save_event_logs_raw_file()

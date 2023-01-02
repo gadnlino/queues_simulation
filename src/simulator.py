@@ -2,243 +2,494 @@ import bisect
 import heapq
 import json
 import os
+import csv
 
 import numpy as np
 
 from models.event import Event
 from models.event_type import EventType
 
+
 class Simulator:
+
     def __init__(self):
-        self.__q_events: list[Event] = []
+        #arquivo onde o log de eventos da simulação serão salvos
+        self.__event_list_raw_file: str = './event_list_raw.csv'
 
-        self.__q_events_history: list[Event] = []
+        #log de eventos(para depuração posterior)
+        self.__event_list_raw = []
 
-        self.__q_events_history_file = './q_events_history.json'
+        #número de filas do sistema
+        self.__number_of_qs: int = 2
 
-        self.__service_events_history : list[ServiceEvent] = []
+        #taxa de utilização(rho)
+        self.__utilization_pct: float = 0.99
 
-        self.__service_events_history_file = './service_events_history.json'
+        #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento)
+        self.__system_max_arrival_time: float = 1000
 
-        self.__utilization_pct = 0.2
+        #taxa de serviço(definido no enunciado do trabalho)
+        self.__service_rate: float = 1
 
-        #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento da loja)
-        self.__system_max_arrival_time = 10
-        
-        self.__service_rate = 1
+        #taxa de chegada(é obtida a partir das taxas de serviço e utilização, pela formula utilization_pct = (arrival_rate/service_rate))
+        self.__arrival_rate: float = (self.__utilization_pct *
+                                      self.__service_rate)
 
-        self.__arrival_rate = 1/(self.__utilization_pct * self.__service_rate)
+        #número de rodadas da simulação
+        self.__number_of_rounds: int = 5
 
+        #rodada atual
+        self.__current_round: int = 0
+
+    def __reset_simulation_variables(self):
+        """Reseta variáveis de controle para seus valores iniciais."""
+
+        #tempo atual da simulação
         self.__current_timestamp = 0.0
 
+        #cliente atualmente em serviço
         self.__current_service = None
 
-    #insere um evento na fila de eventos
-    def __enqueue_event(self, event: Event):
-        bisect.insort(self.__q_events, event)
+        #lista de eventos principal do simulador
+        self.__event_q: list[Event] = []
+        """representação das filas de espera do sistema, seguindo o número de filas indicado por self.__number_of_qs"""
+        self.__waiting_qs = list(
+            map(lambda _: list(), range(0, self.__number_of_qs)))
 
-    #remove um evento na fila de eventos
+    def __get_arrival_time(self):
+        """Obtém o tempo de chegada de um novo cliente, a partir de uma distribuição exponencial com taxa self.__arrival_rate.
+
+        Returns
+        ----------
+        time: float
+            Uma amostra de uma variável exponencial, representando um tempo de chegada."""
+        
+        return np.random.exponential(scale=1.0 / self.__arrival_rate)
+
+    def __get_service_time(self):
+        """Obtém o tempo de serviço de um cliente, a partir de uma distribuição exponencial com taxa self.__service_rate.
+
+        Returns
+        ----------
+        time: float
+            Uma amostra de uma variável exponencial, representando um tempo de serviço."""
+        return np.random.exponential(scale=1.0 / self.__service_rate)
+
+    def __enqueue_event(self, event: Event, in_the_front: bool = False):
+        """Insere um evento na lista de eventos.\n
+        Os eventos são inseridos de maneira que a lista sempre se mantém ordenada pelo timestamp de ocorrência dos eventos.
+
+        Parameters
+        ----------
+        event : Event
+            O evento a ser inserido na lista de eventos.
+        in_the_front: bool, optional
+            Caso seja informado como True, o evento é inserido na primeira posição da lista(para tratamento imediato)."""
+
+        if (in_the_front):
+            self.__event_q.insert(0, event)
+        else:
+            bisect.insort(self.__event_q, event)
+
     def __dequeue_event(self) -> Event:
-        event = self.__q_events[0]
+        """Remove um evento na lista de eventos. O evento removido é inserido no log de eventos(self.__event_list_raw).
 
-        #adicionando no histórico de eventos
-        self.__q_events_history.append(event)
+        Returns
+        -------
+        event: Event
+            O evento na primeira posição da lista."""
+        event = self.__event_q.pop(0)
 
-        self.__q_events.pop(0)
+        self.__event_list_raw.append({
+            'reference':
+            'event',
+            **event.as_dict(), 
+            'round': self.__current_round
+        })
 
         return event
 
-    #realizando flush do histórico de eventos
-    def __save_event_history(self, event_list, out_file):
-        f1 = open(out_file, 'a+')
+    def __dequeue_from_waiting_q(self, queue_number: int):
+        """Remove um cliente da fila de espera.\n
+        O evento de remoção do cliente é inserido no log de eventos(self.__event_list_raw).
 
-        try:
-            event_history_list = []
+        Parameters
+        ----------
+        queue_number : int
+            O número da fila de espera que o cliente será removido.
 
-            file_contents = f1.read()
+        Returns
+        -------
+        next_client: int
+            O id do cliente na primeira posição da fila."""
 
-            if(not(not(file_contents))):
-                event_history_list = json.loads(file_contents)
+        next_client = self.__waiting_qs[queue_number - 1].pop(0)
 
-            for event in event_list:
-                event_history_list.append(event.as_dict())
-            
-            f1.write(json.dumps(event_history_list))
-        finally:
-            f1.close()
+        self.__event_list_raw.append({
+            'reference': 'dequeue',
+            'queue_number': queue_number,
+            'timestamp': self.__current_timestamp,
+            'client_id': next_client[0],
+            'remaining_service_time': next_client[1],
+            'round': self.__current_round
+        })
 
-    #get an arrival time, given the poisson distribution(exponential inter arrivals)
-    def __get_arrival_time(self):
-        return np.random.exponential(scale=1.0/self.__arrival_rate) 
-    
-    #get an service time, given the exponential distribution
-    def __get_service_time(self):
-        return np.random.exponential(scale=1.0/self.__service_rate)
+        return next_client
 
-    #determine if and arrive should occur, based on a utilization factor
-    def __should_arrive(self):
-        return True
-        #return np.random.uniform(low=0, high=1) > 1 - self.__utilization
+    def __enqueue_in_waiting_q(self,
+                               client_id: int,
+                               queue_number: int,
+                               remaining_service_time: float = None,
+                               in_the_front: bool = False):
+        """Insere um cliente em uma fila de espera.
+
+        Parameters
+        ----------
+        client_id : int
+            O id do cliente a ser inserido na fila de espera.
+        queue_number : int
+            O número da fila de espera para inserir o cliente.
+        remaining_service_time : float, optional
+            O tempo de serviço restante do serviço interrrompido do cliente.
+        in_the_front : bool, optional
+            Caso True, insere o cliente na primeira posição da fila."""
+
+        self.__event_list_raw.append({
+            'reference': 'enqueue',
+            'queue_number': queue_number,
+            'timestamp': self.__current_timestamp,
+            'client_id': client_id,
+            'remaining_service_time': remaining_service_time,
+            'in_the_front': in_the_front,
+            'round': self.__current_round
+        })
+
+        if (in_the_front):
+            self.__waiting_qs[queue_number - 1].insert(
+                0, (client_id, remaining_service_time))
+        else:
+            self.__waiting_qs[queue_number - 1].append(
+                (client_id, remaining_service_time))
 
     def __remove_current_service_departure(self):
-        departures_current_service = list(filter(lambda x: x.type == EventType.DEPARTURE \
-                        and x.client_id == self.__current_service.client_id
-                        and x.queue_number == self.__current_service.queue_number, self.__q_events))
+        """Remove a partida do sistema agendada para o cliente atualmente em serviço.\n
+        Essa função só é chamada em casos em que há preempção de serviço."""
+        current_client_id, _ = self.__get_current_service()
 
-        self.__q_events.remove(departures_current_service[0])
+        departures_current_service = list(
+            filter(
+                lambda x: x.type == EventType.DEPARTURE and x.client_id ==
+                current_client_id and x.queue_number == 2, self.__event_q))
+
+        self.__event_q.remove(departures_current_service[0])
+
+    def __get_next_client_in_waiting_q(self, queue_number: int) -> int:
+        """Obtém(sem remover) o cliente na primeira posição de uma fila de espera.
+
+        Parameters
+        ----------
+        queue_number : int
+            O número da fila de espera para obter o cliente.
+        
+        Returns
+        ----------
+        client_id: int
+            o id do cliente na primeira posição da fila de espera."""
+        return self.__waiting_qs[queue_number - 1][0]
+
+    def __get_waiting_q_size(self, queue_number: int) -> int:
+        """Obtém o número de clientes presentes na fila de espera.
+
+        Parameters
+        ----------
+        queue_number : int
+            O número da fila de espera especificada.
+        
+        Returns
+        ----------
+        length: int
+            O número de clientes presentes na fila de espera."""
+        return len(self.__waiting_qs[queue_number - 1])
 
     def __get_end_of_current_service(self):
+        """Obtém o timestamp do término do seviço corrente.
+        
+        Returns
+        ----------
+        timestamp: float
+            O instante do término do serviço corrente."""
+        current_client_id, _ = self.__get_current_service()
+
         departures_current_service = list(filter(lambda x: x.type == EventType.DEPARTURE \
-                        and x.client_id == self.__current_service.client_id
-                        and x.queue_number == self.__current_service.queue_number, self.__q_events))
-                        
-        departures_current_service.sort(key= lambda x : x.timestamp)
+                        and x.client_id == current_client_id
+                        and x.queue_number == 2, self.__event_q))
+
+        departures_current_service.sort(key=lambda x: x.timestamp)
 
         end_of_current_service = departures_current_service[0].timestamp
-        
+
         return end_of_current_service
 
-    #tratando os eventos do tipo EventType.ARRIVAL
-    def __handle_arrival(self, event: Event):
-        self.__current_timestamp = event.timestamp
+    def __get_current_service(self):
+        """Obtém as informações do serviço corrente.
         
-        #agenda a próxima chegada na fila 1
-        def schedule_next_arrival():
-            next_arrival_time = self.__current_timestamp + self.__get_arrival_time()
+        Returns
+        ----------
+        timestamp: tuple[int, EventType]
+            O client_id do cliente do serviço corrente, e o tipo de evento originário do serviço."""
+        if (self.__current_service == None):
+            return None, None
 
-            if(next_arrival_time <= self.__system_max_arrival_time and self.__should_arrive()):
-                self.__enqueue_event(\
-                    Event(timestamp=next_arrival_time,\
-                        type=EventType.ARRIVAL, queue_number=1))
+        return self.__current_service
 
-        should_schedule_next_arrival = False
+    def __set_current_service(self, client_id: int,
+                              source_event_type: EventType):
+        """Salva as informações do serviço corrente.
+        
+        Parameters
+        ----------
+        client_id: int
+            O id do cliente servido.
+        source_event_type:EventType
+            O tipo do evento que originou o serviço corrente."""
+        
+        self.__current_service = (client_id, source_event_type)
 
-        if(event.queue_number == 1):
-            if(self.__current_service == None): #serviço livre, posso processar cliente atual
-                print('caso 1')
-                
-                #agenda a saída do cliente atual da fila 1
-                self.__enqueue_event(\
-                    Event(timestamp=self.__current_timestamp + self.__get_service_time(),\
-                        type=EventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
+    def __schedule_next_arrival(self):
+        """Agenda a próxima chegada de um cliente ao sistema.\n
+        O tempo de chegada do próximo cliente é determinado pela função self.__get_arrival_time."""
 
-                should_schedule_next_arrival = True
+        next_arrival_time = \
+            self.__current_timestamp + self.__get_arrival_time()
 
-                self.__current_service = event
+        if (next_arrival_time <= self.__system_max_arrival_time):
+            self.__enqueue_event(
+                Event(timestamp=next_arrival_time,
+                      type=EventType.ARRIVAL,
+                      queue_number=1))
 
-                self.__service_events_history.append(
-                    ServiceEvent(type=ServiceEventType.SERVICE_STARTED, timestamp=self.__current_timestamp, client_id=event.client_id, queue_number=event.queue_number))
-            elif(self.__current_service.queue_number == 1):#serviço ocupado por alguem da fila 1, agendo uma nova chegada desse cliente para o final do serviço atual
-                print('caso 2')
-                
-                self.__enqueue_event(\
-                        Event(timestamp=self.__get_end_of_current_service(),\
-                            type=EventType.ARRIVAL, queue_number=event.queue_number, client_id=event.client_id))
-            else:#serviço ocupado por alguem da fila 2, agendo uma nova chegada desse cliente para o final do serviço atual
-                print('caso 3')
-                end_of_current_service = self.__get_end_of_current_service()
-                remaining_service_time = \
-                    end_of_current_service - self.__current_timestamp
+    def __handle_arrival(self, event: Event):
+        """Trata o evento do tipo EventType.ARRIVAL.\n
+        Se não há serviço corrente, o cliente recém chegado inicia imediatamente o seu serviço(EventType.START_SERVICE_1).\n
+        Se o serviço corrente é oriundo da fila de espera 1, o cliente é inserido na fila de espera 1.\n
+        Caso o serviço corrente seja oriundo da fila de espera 2, o serviço desse cliente é interrompido(EventType.HALT_SERVICE_2), e o cliente recém chegado inicia o serviço imediatamente."""
 
-                self.__service_events_history.append(
-                    ServiceEvent(type=ServiceEventType.SERVICE_HALTED, \
-                        timestamp=self.__current_timestamp, \
-                            client_id=self.__current_service.client_id, \
-                                queue_number=self.__current_service.queue_number))
+        current_client_id, current_source_event_type = self.__get_current_service(
+        )
 
-                #remover partida posterior do serviço que veio da fila 2 e agora foi interrompido
-                self.__remove_current_service_departure()
+        if (current_client_id == None):
+            next_client = Event(timestamp=self.__current_timestamp,
+                                type=EventType.START_SERVICE_1,
+                                queue_number=1,
+                                client_id=event.client_id)
 
-                self.__enqueue_event(\
-                    Event(timestamp=end_of_current_service,\
-                        type=EventType.ARRIVAL, queue_number=self.__current_service.queue_number,\
-                             client_id=self.__current_service.client_id,\
-                                 remaining_service_time=remaining_service_time))
-
-                #agenda a saída do cliente do evento atual da fila 1
-                self.__enqueue_event(\
-                    Event(timestamp=self.__current_timestamp + self.__get_service_time(),\
-                        type=EventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
-                
-                should_schedule_next_arrival = True
-
-                self.__current_service = event
-
-                self.__service_events_history.append(
-                    ServiceEvent(type=ServiceEventType.SERVICE_STARTED, timestamp=self.__current_timestamp, client_id=event.client_id, queue_number=event.queue_number))
+            self.__enqueue_in_waiting_q(event.client_id, 1)
+            self.__enqueue_event(next_client, True)
+        elif (current_source_event_type == EventType.START_SERVICE_1):
+            #enfileira cliente na fila 1
+            self.__enqueue_in_waiting_q(event.client_id, 1)
         else:
-            if(self.__current_service == None):
-                print('caso 4')
-                service_time = None
+            self.__enqueue_in_waiting_q(event.client_id, 1)
 
-                if(event.remaining_service_time != None):
-                    service_time = event.remaining_service_time
-                else:
-                    service_time = self.__get_service_time()
+            if (self.__get_waiting_q_size(1) == 1):
+                next_client = Event(timestamp=self.__current_timestamp,
+                                    type=EventType.START_SERVICE_1,
+                                    queue_number=1,
+                                    client_id=event.client_id)
 
-                #agenda a saída do cliente atual da fila 2
-                self.__enqueue_event(\
-                    Event(timestamp=self.__current_timestamp + service_time,\
-                        type=EventType.DEPARTURE, queue_number=event.queue_number, client_id=event.client_id))
+                self.__enqueue_event(next_client, True)
 
-                self.__current_service = event
+                current_client_id, _ = self.__get_current_service()
 
-                self.__service_events_history.append(
-                    ServiceEvent(type=ServiceEventType.SERVICE_STARTED, timestamp=self.__current_timestamp, client_id=event.client_id, queue_number=event.queue_number))
+                halt_service = Event(timestamp=self.__current_timestamp,
+                                     type=EventType.HALT_SERVICE_2,
+                                     queue_number=2,
+                                     client_id=current_client_id)
 
-            else:
-                print('caso 5')
-                
-                self.__enqueue_event(\
-                        Event(timestamp=self.__get_end_of_current_service(),\
-                            type=EventType.ARRIVAL, queue_number=event.queue_number, client_id=event.client_id))
+                self.__enqueue_event(halt_service, True)
 
-        if(should_schedule_next_arrival):
-            schedule_next_arrival()
+        self.__schedule_next_arrival()
+
+    def __handle_start_service_1(self, event: Event):
+        """Trata o evento do tipo EventType.START_SERVICE_1.\n
+        O cliente é removido da fila de espera 1.\n
+        É obtido o tempo do serviço, e agendada o evento de término do serviço(EventType.END_SERVICE_1)."""
+
+        next_client, _ = self.__dequeue_from_waiting_q(event.queue_number)
+
+        self.__set_current_service(next_client, event.type)
+
+        self.__enqueue_event(
+            Event(timestamp=self.__current_timestamp +
+                  self.__get_service_time(),
+                  type=EventType.END_SERVICE_1,
+                  queue_number=1,
+                  client_id=event.client_id))
+
+    def __handle_end_service_1(self, event: Event):
+        """Trata o evento do tipo EventType.END_SERVICE_1.\n
+        Caso as filas de esperas 1 e 2 estejam vazias, o cliente inicia o seu segundo serviço imediatamente(EventType.START_SERVICE_2).\n
+        Caso haja clientes em alguma fila de espera, o cliente é enfileirado na fila de espera 2, e o serviço da fila mais prioritária é iniciado."""
+
+        next_event = Event(timestamp=self.__current_timestamp,
+                           type=EventType.START_SERVICE_2,
+                           queue_number=2,
+                           client_id=event.client_id)
+
+        self.__enqueue_in_waiting_q(event.client_id, 2)
+        self.__set_current_service(None, None)
+
+        if (self.__get_waiting_q_size(1) < 1
+                and self.__get_waiting_q_size(2) == 1):
+            self.__enqueue_event(next_event, True)
+        elif (self.__get_waiting_q_size(1) > 0):
+            next_client_id, _ = self.__get_next_client_in_waiting_q(1)
+
+            next_event = Event(client_id=next_client_id,
+                               type=EventType.START_SERVICE_1,
+                               timestamp=self.__current_timestamp,
+                               queue_number=1)
+
+            self.__enqueue_event(next_event, True)
+        elif (self.__get_waiting_q_size(2) > 0):
+            next_client_id, _ = self.__get_next_client_in_waiting_q(2)
+
+            next_event = Event(client_id=next_client_id,
+                               type=EventType.START_SERVICE_2,
+                               timestamp=self.__current_timestamp,
+                               queue_number=2)
+
+            self.__enqueue_event(next_event, True)
+
+    def __handle_start_service_2(self, event: Event):
+        """Trata o evento do tipo EventType.START_SERVICE_2.\n
+        O cliente é removido da fila de espera 2.\n
+        É obtido o tempo do serviço, e agendada o evento de saída do sistema(EventType.DEPARTURE)."""
+
+        next_client, remaining_service_time = self.__dequeue_from_waiting_q(
+            event.queue_number)
+
+        self.__set_current_service(next_client, event.type)
+
+        if (remaining_service_time == None):
+            self.__enqueue_event(
+                Event(timestamp=self.__current_timestamp +
+                      self.__get_service_time(),
+                      type=EventType.DEPARTURE,
+                      queue_number=2,
+                      client_id=event.client_id))
+        else:
+            self.__enqueue_event(
+                Event(timestamp=self.__current_timestamp +
+                      remaining_service_time,
+                      type=EventType.DEPARTURE,
+                      queue_number=2,
+                      client_id=event.client_id))
+
+    def __handle_halt_service_2(self, event: Event):
+        """Trata o evento do tipo EventType.HALT_SERVICE_2.\n
+        O evento de saída do sistema do cliente atual é removido da fila de eventos, e o cliente é enfileirado na primeira posição da fila 2."""
+
+        client_id, _ = self.__get_current_service()
+
+        remaining_service_time = \
+                    self.__get_end_of_current_service() - self.__current_timestamp
+
+        if (not (remaining_service_time > 0.0)):
+            remaining_service_time = None
+
+        self.__remove_current_service_departure()
+
+        self.__enqueue_in_waiting_q(
+            client_id,
+            2,
+            in_the_front=True,
+            remaining_service_time=remaining_service_time)
+
+        self.__set_current_service(None, None)
 
     def __handle_departure(self, event: Event):
-        self.__current_timestamp = event.timestamp
+        """Trata o evento do tipo EventType.DEPARTURE.\n
+        O cliente é removido do serviço corrente, e o cliente da primeira posição da fila mais prioritária tem o serviço iniciado."""
 
-        self.__service_events_history.append(
-            ServiceEvent(type=ServiceEventType.SERVICE_FINISHED, timestamp=self.__current_timestamp, client_id=self.__current_service.client_id, queue_number=self.__current_service.queue_number))
+        if (self.__get_waiting_q_size(1) > 0):
+            next_client_id, _ = self.__get_next_client_in_waiting_q(1)
+
+            next_event = Event(client_id=next_client_id,
+                               type=EventType.START_SERVICE_1,
+                               timestamp=self.__current_timestamp,
+                               queue_number=1)
+
+            self.__enqueue_event(next_event, in_the_front=True)
+        elif (self.__get_waiting_q_size(2) > 0):
+            next_client_id, _ = self.__get_next_client_in_waiting_q(2)
+
+            next_event = Event(client_id=next_client_id,
+                               type=EventType.START_SERVICE_2,
+                               timestamp=self.__current_timestamp,
+                               queue_number=2)
+
+            self.__enqueue_event(next_event, in_the_front=True)
 
         self.__current_service = None
 
-        if(event.queue_number == 1):
-            #agenda a chegada do cliente atual na fila 2
-            self.__enqueue_event(\
-                Event(timestamp=self.__current_timestamp,\
-                    type=EventType.ARRIVAL, queue_number=2, client_id=event.client_id))
+    def __save_event_list_raw(self):
+        """Salva o evento no log de eventos."""
 
-    #executa passos da simulação
+        if (os.path.exists(self.__event_list_raw_file)):
+            os.remove(self.__event_list_raw_file)
+
+        if (len(self.__event_list_raw) > 0):
+            with open(self.__event_list_raw_file, 'a+',
+                      newline='') as output_file:
+
+                fieldnames = [
+                    'reference', 'type', 'queue_number', 'timestamp',
+                    'client_id', 'remaining_service_time', 'in_the_front',
+                    'round'
+                ]
+
+                dict_writer = csv.DictWriter(output_file,
+                                             fieldnames=fieldnames)
+                dict_writer.writeheader()
+                dict_writer.writerows(self.__event_list_raw)
+
     def run(self):
-        #enfileirando a primeira chegada na fila 1
-        self.__enqueue_event(\
-            Event(\
-                timestamp=self.__current_timestamp + self.__get_arrival_time(), \
-                    type=EventType.ARRIVAL, queue_number=1))
-        
+        """Loop principal do simulador.\n
+        Remove-se o evento na primeira posição da lista de eventos, e delega-se para a função de tratamento adequada.
+        Ao final da execução de todas as rodadas, salva o log de eventos no arquivo .csv"""
+
         try:
-            while(len(self.__q_events) > 0):
-                event: Event = self.__dequeue_event()
+            for round_number in range(0, self.__number_of_rounds):
+                self.__reset_simulation_variables()
 
-                print(event.timestamp)
+                #enfileirando a primeira chegada na fila 1
+                self.__enqueue_event(
+                    Event(timestamp=self.__current_timestamp +
+                          self.__get_arrival_time(),
+                          type=EventType.ARRIVAL,
+                          queue_number=1))
 
-                if(event.type == EventType.ARRIVAL):
-                    self.__handle_arrival(event)
-                elif (event.type == EventType.DEPARTURE):
-                    self.__handle_departure(event)
+                self.__current_round = round_number
+
+                while (len(self.__event_q) > 0):
+                    event: Event = self.__dequeue_event()
+
+                    self.__current_timestamp = event.timestamp
+
+                    print(event)
+
+                    if (event.type == EventType.ARRIVAL):
+                        self.__handle_arrival(event)
+                    elif (event.type == EventType.START_SERVICE_1):
+                        self.__handle_start_service_1(event)
+                    elif (event.type == EventType.END_SERVICE_1):
+                        self.__handle_end_service_1(event)
+                    elif (event.type == EventType.START_SERVICE_2):
+                        self.__handle_start_service_2(event)
+                    elif (event.type == EventType.HALT_SERVICE_2):
+                        self.__handle_halt_service_2(event)
+                    elif (event.type == EventType.DEPARTURE):
+                        self.__handle_departure(event)
         finally:
-            if(os.path.exists(self.__q_events_history_file)):
-                os.remove(self.__q_events_history_file)
-
-            if(len(self.__q_events_history) > 0):
-                    self.__save_event_history(self.__q_events_history, self.__q_events_history_file)
-                    self.__q_events_history.clear()
-
-            if(os.path.exists(self.__service_events_history_file)):
-                os.remove(self.__service_events_history_file)
-
-            if(len(self.__service_events_history) > 0):
-                    self.__save_event_history(self.__service_events_history, self.__service_events_history_file)
-                    self.__service_events_history.clear()
+            self.__save_event_list_raw()

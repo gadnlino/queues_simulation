@@ -25,20 +25,11 @@ class Simulator:
         self.__opt_save_metric_per_round_file = save_metric_per_round_file
         self.__opt_save_raw_event_log_file = save_raw_event_log_file
 
-        #arquivo onde o log de eventos da simulação serão salvos
-        self.__event_log_raw_file: str = './event_log_raw.csv'
-
-        #log de eventos(para depuração posterior)
-        self.__event_log_raw = []
-
         #número de filas do sistema
         self.__number_of_qs: int = 2
 
         #taxa de utilização(rho)
         self.__utilization_pct: float = utilization_pct
-
-        #tempo máximo de chegada de pessoas no sistema(tempo de funcionamento)
-        self.__system_max_arrival_time: float = 1000
 
         #taxa de serviço(definido no enunciado do trabalho)
         self.__service_rate: float = service_rate
@@ -58,9 +49,11 @@ class Simulator:
 
         self.__metrics_per_round = []
 
-        self.__events_current_round: list[Event] = []
+        #log de eventos(para depuração posterior)
+        self.__event_log_raw = []
 
-        self.__metric_samples_current_round: list[Metric] = []
+        #arquivo onde o log de eventos da simulação serão salvos
+        self.__event_log_raw_file: str = './event_log_raw.csv'
 
     def __reset_simulation_variables(self):
         """Reseta variáveis de controle para seus valores iniciais."""
@@ -77,11 +70,11 @@ class Simulator:
         self.__waiting_qs = list(
             map(lambda _: list(), range(0, self.__number_of_qs)))
 
+        self.__served_clients_current_round = 0
+
         self.__events_current_round: list[Event] = []
 
         self.__metric_samples_current_round: list[Metric] = []
-
-        self.__served_clients = 0
 
     def __get_estimated_mean_and_std(self, samples: 'list[float]'):
         est_mean = sum(samples) / len(samples)
@@ -566,7 +559,7 @@ class Simulator:
         """Agenda a próxima chegada de um cliente ao sistema.\n
         O tempo de chegada do próximo cliente é determinado pela função self.__get_arrival_time."""
 
-        if (self.__served_clients <= self.__round_size):
+        if (self.__served_clients_current_round <= self.__round_size):
             next_arrival_time = self.__current_timestamp + self.__get_arrival_time(
             )
 
@@ -617,7 +610,7 @@ class Simulator:
 
                 self.__enqueue_event(halt_service, True)
 
-        self.__served_clients = self.__served_clients + 1
+        self.__served_clients_current_round = self.__served_clients_current_round + 1
 
         self.__schedule_next_arrival()
 

@@ -3,15 +3,18 @@ import heapq
 import json
 import os
 import csv
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from models.event import Event
 from models.event_type import EventType
 from models.metric import Metric
 from models.metric_type import MetricType
-from datetime import datetime
+from utils.estimator import Estimator
+
 
 class Simulator:
 
@@ -21,7 +24,8 @@ class Simulator:
                  number_of_rounds: int,
                  round_sample_size: int,
                  save_metric_per_round_file: bool = True,
-                 save_raw_event_log_file: bool = False):
+                 save_raw_event_log_file: bool = False,
+                 plot_metrics_per_round=False):
         #taxa de utilização(rho)
         self.__utilization_pct: float = utilization_pct
 
@@ -44,13 +48,38 @@ class Simulator:
         #flag para salvar o arquivo de log de eventos ao final da simulação
         self.__opt_save_raw_event_log_file = save_raw_event_log_file
 
+        #flag para plotar um gráfico com a evolução das métricas ao final da simulação
+        self.__opt_plot_metrics_per_round = plot_metrics_per_round
+
         #número de filas do sistema
         self.__number_of_qs: int = 2
 
         #rodada atual
         self.__current_round: int = 0
 
-        self.__metrics_per_round = []
+        self.__metrics_per_round = pd.DataFrame(columns=[
+            'round',
+            f'{str(MetricType.W1)}_est_mean',
+            f'{str(MetricType.W1)}_est_var',
+            f'{str(MetricType.W2)}_est_mean',
+            f'{str(MetricType.W2)}_est_var',
+            f'{str(MetricType.X1)}_est_mean',
+            f'{str(MetricType.X1)}_est_var',
+            f'{str(MetricType.X2)}_est_mean',
+            f'{str(MetricType.X2)}_est_var',
+            f'{str(MetricType.T1)}_est_mean',
+            f'{str(MetricType.T1)}_est_var',
+            f'{str(MetricType.T2)}_est_mean',
+            f'{str(MetricType.T2)}_est_var',
+            f'{str(MetricType.NQ1)}_est_mean',
+            f'{str(MetricType.NQ1)}_est_var',
+            f'{str(MetricType.NQ2)}_est_mean',
+            f'{str(MetricType.NQ2)}_est_var',
+            f'{str(MetricType.N1)}_est_mean',
+            f'{str(MetricType.N1)}_est_var',
+            f'{str(MetricType.N2)}_est_mean',
+            f'{str(MetricType.N2)}_est_var',
+        ])
 
         #log de eventos(para depuração posterior)
         self.__event_log_raw = []
@@ -71,9 +100,32 @@ class Simulator:
         self.__waiting_qs = list(
             map(lambda _: list(), range(0, self.__number_of_qs)))
 
+        self.__metric_estimators_simulation = {
+            f'{str(MetricType.W1)}_est_mean': Estimator(),
+            f'{str(MetricType.W1)}_est_var': Estimator(),
+            f'{str(MetricType.W2)}_est_mean': Estimator(),
+            f'{str(MetricType.W2)}_est_var': Estimator(),
+            f'{str(MetricType.X1)}_est_mean': Estimator(),
+            f'{str(MetricType.X1)}_est_var': Estimator(),
+            f'{str(MetricType.X2)}_est_mean': Estimator(),
+            f'{str(MetricType.X2)}_est_var': Estimator(),
+            f'{str(MetricType.T1)}_est_mean': Estimator(),
+            f'{str(MetricType.T1)}_est_var': Estimator(),
+            f'{str(MetricType.T2)}_est_mean': Estimator(),
+            f'{str(MetricType.T2)}_est_var': Estimator(),
+            f'{str(MetricType.NQ1)}_est_mean': Estimator(),
+            f'{str(MetricType.NQ1)}_est_var': Estimator(),
+            f'{str(MetricType.NQ2)}_est_mean': Estimator(),
+            f'{str(MetricType.NQ2)}_est_var': Estimator(),
+            f'{str(MetricType.N1)}_est_mean': Estimator(),
+            f'{str(MetricType.N1)}_est_var': Estimator(),
+            f'{str(MetricType.N2)}_est_mean': Estimator(),
+            f'{str(MetricType.N2)}_est_var': Estimator(),
+        }
+
     def __reset_round_control_variables(self):
         """Reseta variáveis de controle da rodada para seus valores iniciais."""
-        
+
         #número de serviços na rodada atual
         self.__served_clients_current_round = 0
 
@@ -82,6 +134,19 @@ class Simulator:
 
         #amostras das métricas que foram colhidas na rodada atual
         self.__metric_samples_current_round: list[Metric] = []
+
+        self.__metric_estimators_current_round = {
+            str(MetricType.W1): Estimator(),
+            str(MetricType.W2): Estimator(),
+            str(MetricType.X1): Estimator(),
+            str(MetricType.X2): Estimator(),
+            str(MetricType.T1): Estimator(),
+            str(MetricType.T2): Estimator(),
+            str(MetricType.NQ1): Estimator(),
+            str(MetricType.NQ2): Estimator(),
+            str(MetricType.N1): Estimator(),
+            str(MetricType.N2): Estimator(),
+        }
 
     def __get_estimated_mean_and_var(self, samples: 'list[float]'):
         est_mean = sum(samples) / len(samples)
@@ -253,106 +318,80 @@ class Simulator:
                                 queue_number)
 
             if (metric != None):
+                self.__metric_estimators_current_round[str(
+                    metric.type)].add_sample(metric.value)
                 self.__metric_samples_current_round.append(metric)
 
     def __generate_round_metrics(self):
-        w1_est_mean, w1_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.W1,
-                           self.__metric_samples_current_round))))
-
-        w2_est_mean, w2_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.W2,
-                           self.__metric_samples_current_round))))
-
-        x1_est_mean, x1_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.X1,
-                           self.__metric_samples_current_round))))
-
-        x2_est_mean, x2_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.X2,
-                           self.__metric_samples_current_round))))
-
-        t1_est_mean, t1_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.T1,
-                           self.__metric_samples_current_round))))
-
-        t2_est_mean, t2_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.T2,
-                           self.__metric_samples_current_round))))
-
-        nq1_est_mean, nq1_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.NQ1,
-                           self.__metric_samples_current_round))))
-
-        nq2_est_mean, nq2_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.NQ2,
-                           self.__metric_samples_current_round))))
-
-        n1_est_mean, n1_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.N1,
-                           self.__metric_samples_current_round))))
-
-        n2_est_mean, n2_est_var = self.__get_estimated_mean_and_var(
-            list(
-                map(
-                    lambda x: x.value,
-                    filter(lambda x: x.type == MetricType.N2,
-                           self.__metric_samples_current_round))))
-
         current_round_metrics = {
-            'round': self.__current_round,
-            f'{str(MetricType.W1)}_est_mean': w1_est_mean,
-            f'{str(MetricType.W1)}_est_var': w1_est_var,
-            f'{str(MetricType.W2)}_est_mean': w2_est_mean,
-            f'{str(MetricType.W2)}_est_var': w2_est_var,
-            f'{str(MetricType.X1)}_est_mean': x1_est_mean,
-            f'{str(MetricType.X1)}_est_var': x1_est_var,
-            f'{str(MetricType.X2)}_est_mean': x2_est_mean,
-            f'{str(MetricType.X2)}_est_var': x2_est_var,
-            f'{str(MetricType.T1)}_est_mean': t1_est_mean,
-            f'{str(MetricType.T1)}_est_var': t1_est_var,
-            f'{str(MetricType.T2)}_est_mean': t2_est_mean,
-            f'{str(MetricType.T2)}_est_var': t2_est_var,
-            f'{str(MetricType.NQ1)}_est_mean': nq1_est_mean,
-            f'{str(MetricType.NQ1)}_est_var': nq1_est_var,
-            f'{str(MetricType.NQ2)}_est_mean': nq2_est_mean,
-            f'{str(MetricType.NQ2)}_est_var': nq2_est_var,
-            f'{str(MetricType.N1)}_est_mean': n1_est_mean,
-            f'{str(MetricType.N1)}_est_var': n1_est_var,
-            f'{str(MetricType.N2)}_est_mean': n2_est_mean,
-            f'{str(MetricType.N2)}_est_var': n2_est_var,
+            'round':
+            self.__current_round,
+            f'{str(MetricType.W1)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.W1)].mean(),
+            f'{str(MetricType.W1)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.W1)].variance(),
+            f'{str(MetricType.W2)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.W2)].mean(),
+            f'{str(MetricType.W2)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.W2)].variance(),
+            f'{str(MetricType.X1)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.X1)].mean(),
+            f'{str(MetricType.X1)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.X1)].variance(),
+            f'{str(MetricType.X2)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.X2)].mean(),
+            f'{str(MetricType.X2)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.X2)].variance(),
+            f'{str(MetricType.T1)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.T1)].mean(),
+            f'{str(MetricType.T1)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.T1)].variance(),
+            f'{str(MetricType.T2)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.T2)].mean(),
+            f'{str(MetricType.T2)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.T2)].variance(),
+            f'{str(MetricType.NQ1)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.NQ1)].mean(),
+            f'{str(MetricType.NQ1)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.NQ1)].variance(),
+            f'{str(MetricType.NQ2)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.NQ2)].mean(),
+            f'{str(MetricType.NQ2)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.NQ2)].variance(),
+            f'{str(MetricType.N1)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.N1)].mean(),
+            f'{str(MetricType.N1)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.N1)].variance(),
+            f'{str(MetricType.N2)}_est_mean':
+            self.__metric_estimators_current_round[str(MetricType.N2)].mean(),
+            f'{str(MetricType.N2)}_est_var':
+            self.__metric_estimators_current_round[str(
+                MetricType.N2)].variance(),
         }
 
         #print(current_round_metrics)
 
-        self.__metrics_per_round.append(current_round_metrics)
+        self.__metrics_per_round = \
+            pd.concat([self.__metrics_per_round, pd.DataFrame(current_round_metrics, index=[self.__current_round])])
+
+        for k in self.__metric_estimators_simulation:
+            [tp, _, stat] = k.split("_")
+
+            if (stat == 'mean'):
+                self.__metric_estimators_simulation[k].add_sample(
+                    self.__metric_estimators_current_round[tp].mean())
+            elif (stat == 'var'):
+                self.__metric_estimators_simulation[k].add_sample(
+                    self.__metric_estimators_current_round[tp].variance())
 
     def __get_arrival_time(self):
         """Obtém o tempo de chegada de um novo cliente, a partir de uma distribuição exponencial com taxa self.__arrival_rate.
@@ -467,7 +506,7 @@ class Simulator:
         else:
             self.__waiting_qs[queue_number - 1].append(
                 (client_id, remaining_service_time))
-        
+
         if (self.__opt_save_raw_event_log_file):
             self.__event_log_raw.append({
                 'reference': 'enqueue',
@@ -767,9 +806,8 @@ class Simulator:
                       newline='') as output_file:
 
                 fieldnames = [
-                    'reference', 'type', 'queue_number', 'timestamp',
-                    'client_id', 'remaining_service_time', 'in_the_front',
-                    'round'
+                    'round', 'reference', 'type', 'queue_number', 'timestamp',
+                    'client_id', 'remaining_service_time', 'in_the_front'
                 ]
 
                 dict_writer = csv.DictWriter(output_file,
@@ -786,38 +824,28 @@ class Simulator:
             os.remove(file_name)
 
         if (len(self.__metrics_per_round) > 0):
-            with open(file_name, 'a+', newline='') as output_file:
+            self.__metrics_per_round.to_csv(file_name,
+                                            sep=',',
+                                            encoding='utf-8',
+                                            index=False)
 
-                fieldnames = [
-                    'round',
-                    f'{str(MetricType.W1)}_est_mean',
-                    f'{str(MetricType.W1)}_est_var',
-                    f'{str(MetricType.W2)}_est_mean',
-                    f'{str(MetricType.W2)}_est_var',
-                    f'{str(MetricType.X1)}_est_mean',
-                    f'{str(MetricType.X1)}_est_var',
-                    f'{str(MetricType.X2)}_est_mean',
-                    f'{str(MetricType.X2)}_est_var',
-                    f'{str(MetricType.T1)}_est_mean',
-                    f'{str(MetricType.T1)}_est_var',
-                    f'{str(MetricType.T2)}_est_mean',
-                    f'{str(MetricType.T2)}_est_var',
-                    f'{str(MetricType.NQ1)}_est_mean',
-                    f'{str(MetricType.NQ1)}_est_var',
-                    f'{str(MetricType.NQ2)}_est_mean',
-                    f'{str(MetricType.NQ2)}_est_var',
-                    f'{str(MetricType.N1)}_est_mean',
-                    f'{str(MetricType.N1)}_est_var',
-                    f'{str(MetricType.N2)}_est_mean',
-                    f'{str(MetricType.N2)}_est_var',
-                ]
+            print(f'Metric per round file saved at {file_name}')
 
-                dict_writer = csv.DictWriter(output_file,
-                                             fieldnames=fieldnames)
-                dict_writer.writeheader()
-                dict_writer.writerows(self.__metrics_per_round)
+    def __plot_metrics_per_round(self):
+        plt.xlabel('rounds')
 
-                print(f'Metric per round file saved at {file_name}')
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.W1)}_est_mean'],
+                 label='E[W1]')
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.W2)}_est_mean'],
+                 label='E[W2]')
+        plt.legend()
+
+        file_name = f'wait_time_plot_{datetime.utcnow().timestamp()}.png'
+        plt.savefig(file_name)
+
+        print(f'Wait time plot saved at {file_name}')
 
     def run(self):
         """Loop principal do simulador.\n
@@ -857,15 +885,27 @@ class Simulator:
                     elif (event.type == EventType.DEPARTURE):
                         self.__handle_departure(event)
 
-                self.__generate_round_metrics()
+                self.__generate_round_metrics()            
         finally:
             end_time = datetime.utcnow().timestamp()
             simulation_time = end_time - start_time
 
-            print(f'Tempo total de simulação: {simulation_time} s')
+            print(f'Total simulation time: {simulation_time} s')
+
+            print(f'Results after {self.__number_of_rounds} rounds of simulation')
+
+            print()
+
+            for k in self.__metric_estimators_simulation:
+                print(
+                    f'{k}, mean = {self.__metric_estimators_simulation[k].mean()}, variance = {self.__metric_estimators_simulation[k].variance()}'
+                )
 
             if (self.__opt_save_metric_per_round_file):
                 self.__save_metric_per_round_file()
 
             if (self.__opt_save_raw_event_log_file):
                 self.__save_event_logs_raw_file()
+
+            if (self.__opt_plot_metrics_per_round):
+                self.__plot_metrics_per_round()

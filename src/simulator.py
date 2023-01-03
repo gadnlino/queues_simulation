@@ -22,7 +22,8 @@ class Simulator:
                  utilization_pct: float,
                  service_rate: float,
                  number_of_rounds: int,
-                 round_sample_size: int,
+                 samples_per_round: int,
+                 seed: int = None,
                  save_metric_per_round_file: bool = True,
                  save_raw_event_log_file: bool = False,
                  plot_metrics_per_round=False):
@@ -39,8 +40,8 @@ class Simulator:
         #número de rodadas da simulação
         self.__number_of_rounds: int = number_of_rounds
 
-        #número de rodadas da simulação
-        self.__round_sample_size: int = round_sample_size
+        #número de amostras por rodada
+        self.__samples_per_round: int = samples_per_round
 
         #flag para salvar o arquivo de métricas por rodada ao final da simulação
         self.__opt_save_metric_per_round_file = save_metric_per_round_file
@@ -50,6 +51,10 @@ class Simulator:
 
         #flag para plotar um gráfico com a evolução das métricas ao final da simulação
         self.__opt_plot_metrics_per_round = plot_metrics_per_round
+
+        if (seed != None):
+            #setando seed do sistema
+            np.random.seed(seed=seed)
 
         #número de filas do sistema
         self.__number_of_qs: int = 2
@@ -84,9 +89,6 @@ class Simulator:
         #log de eventos(para depuração posterior)
         self.__event_log_raw = []
 
-        #arquivo onde o log de eventos da simulação serão salvos
-        self.__event_log_raw_file: str = './event_log_raw.csv'
-
         #tempo atual da simulação
         self.__current_timestamp = 0.0
 
@@ -100,6 +102,23 @@ class Simulator:
         self.__waiting_qs = list(
             map(lambda _: list(), range(0, self.__number_of_qs)))
 
+        #estimadores das métricas de uma rodada da simulação
+        #serão utilizados para gerar, a cada rodada, as métricas gerais da simulação
+        self.__metric_estimators_current_round = {
+            str(MetricType.W1): Estimator(),
+            str(MetricType.W2): Estimator(),
+            str(MetricType.X1): Estimator(),
+            str(MetricType.X2): Estimator(),
+            str(MetricType.T1): Estimator(),
+            str(MetricType.T2): Estimator(),
+            str(MetricType.NQ1): Estimator(),
+            str(MetricType.NQ2): Estimator(),
+            str(MetricType.N1): Estimator(),
+            str(MetricType.N2): Estimator(),
+        }
+
+        #estimadores para métricas alvo da simulação
+        #serão incrementados a cada rodada
         self.__metric_estimators_simulation = {
             f'{str(MetricType.W1)}_est_mean': Estimator(),
             f'{str(MetricType.W1)}_est_var': Estimator(),
@@ -123,6 +142,14 @@ class Simulator:
             f'{str(MetricType.N2)}_est_var': Estimator(),
         }
 
+        #pasta onde os arquivos de resultado da simulação serão salvos
+        self.__results_folder = f'./results_{str(datetime.utcnow().timestamp()).replace(".", "")}'
+
+        os.mkdir(self.__results_folder)
+
+        #arquivo onde o log de eventos da simulação serão salvos
+        self.__event_log_raw_file: str = f'{self.__results_folder}/event_log_raw.csv'
+
     def __reset_round_control_variables(self):
         """Reseta variáveis de controle da rodada para seus valores iniciais."""
 
@@ -135,25 +162,9 @@ class Simulator:
         #amostras das métricas que foram colhidas na rodada atual
         self.__metric_samples_current_round: list[Metric] = []
 
-        self.__metric_estimators_current_round = {
-            str(MetricType.W1): Estimator(),
-            str(MetricType.W2): Estimator(),
-            str(MetricType.X1): Estimator(),
-            str(MetricType.X2): Estimator(),
-            str(MetricType.T1): Estimator(),
-            str(MetricType.T2): Estimator(),
-            str(MetricType.NQ1): Estimator(),
-            str(MetricType.NQ2): Estimator(),
-            str(MetricType.N1): Estimator(),
-            str(MetricType.N2): Estimator(),
-        }
-
-    def __get_estimated_mean_and_var(self, samples: 'list[float]'):
-        est_mean = sum(samples) / len(samples)
-        est_var = sum(map(lambda x:
-                          (x - est_mean)**2, samples)) / (len(samples) - 1)
-
-        return est_mean, est_var
+        #reseta o estimador de todas as métricas para os valores iniciais
+        for k in self.__metric_estimators_current_round:
+            self.__metric_estimators_current_round[k].clear()
 
     def __generate_metric_samples(self, metric_list: 'list[MetricType]'):
         for m in metric_list:
@@ -606,7 +617,7 @@ class Simulator:
         """Agenda a próxima chegada de um cliente ao sistema.\n
         O tempo de chegada do próximo cliente é determinado pela função self.__get_arrival_time."""
 
-        if (self.__served_clients_current_round <= self.__round_sample_size):
+        if (self.__served_clients_current_round <= self.__samples_per_round):
             next_arrival_time = self.__current_timestamp + self.__get_arrival_time(
             )
 
@@ -818,7 +829,7 @@ class Simulator:
     def __save_metric_per_round_file(self):
         """Salva as métricas por rodada em um arquivo .csv."""
 
-        file_name = f'metric_per_round_{datetime.utcnow().timestamp()}.csv'
+        file_name = f'{self.__results_folder}/metric_per_round_{datetime.utcnow().timestamp()}.csv'
 
         if (os.path.exists(file_name)):
             os.remove(file_name)
@@ -832,20 +843,83 @@ class Simulator:
             print(f'Metric per round file saved at {file_name}')
 
     def __plot_metrics_per_round(self):
+        title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, round_sample_size={self.__samples_per_round}'
+
         plt.xlabel('rounds')
 
         plt.plot(self.__metrics_per_round['round'],
                  self.__metrics_per_round[f'{str(MetricType.W1)}_est_mean'],
-                 label='E[W1]')
+                 label='E[W1]',
+                 color='blue')
+
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.W1)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='red')
+
         plt.plot(self.__metrics_per_round['round'],
                  self.__metrics_per_round[f'{str(MetricType.W2)}_est_mean'],
-                 label='E[W2]')
+                 label='E[W2]',
+                 color='orange')
+        
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.W2)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='black')
+        
+        plt.title(title)
+
         plt.legend()
 
-        file_name = f'wait_time_plot_{datetime.utcnow().timestamp()}.png'
-        plt.savefig(file_name)
+        wait_time_file_name = f'{self.__results_folder}/wait_time_plot_{datetime.utcnow().timestamp()}.png'
 
-        print(f'Wait time plot saved at {file_name}')
+        plt.savefig(wait_time_file_name)
+
+        plt.close()
+
+        print(f'Wait time plot saved at {wait_time_file_name}')
+
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.NQ1)}_est_mean'],
+                 label='E[NQ1]',
+                 color='blue')
+
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.NQ1)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='red')
+
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.NQ2)}_est_mean'],
+                 label='E[NQ2]',
+                 color='orange')
+        
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.NQ2)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='black')
+        
+        plt.title(title)
+
+        plt.legend()
+
+        q_size_file_name = f'{self.__results_folder}/q_size_plot_{datetime.utcnow().timestamp()}.png'
+
+        plt.savefig(q_size_file_name)
+
+        print(f'Queue size plot saved at {q_size_file_name}')
 
     def run(self):
         """Loop principal do simulador.\n
@@ -885,14 +959,16 @@ class Simulator:
                     elif (event.type == EventType.DEPARTURE):
                         self.__handle_departure(event)
 
-                self.__generate_round_metrics()            
+                self.__generate_round_metrics()
         finally:
             end_time = datetime.utcnow().timestamp()
             simulation_time = end_time - start_time
 
             print(f'Total simulation time: {simulation_time} s')
 
-            print(f'Results after {self.__number_of_rounds} rounds of simulation')
+            print(
+                f'Results after {self.__number_of_rounds} rounds of simulation'
+            )
 
             print()
 

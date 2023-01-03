@@ -49,9 +49,17 @@ A representação dos eventos e das métricas também merecem ser destacados. Fo
 - `Metric`
     - example
 
+### Geração de VA's
+
+### Amostragem
+
 ## Teste de correção dos resultados
+
 ## Determinando a fase transiente
+
 ## Análise dos resultados
+### Chegando ao fator mínimo
+
 ## Otimizações
 ## Conclusão
 ### Integrantes do grupo

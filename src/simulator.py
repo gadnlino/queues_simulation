@@ -5,6 +5,7 @@ import os
 import csv
 
 import numpy as np
+import pandas as pd
 
 from models.event import Event
 from models.event_type import EventType
@@ -12,22 +13,15 @@ from models.metric import Metric
 from models.metric_type import MetricType
 from datetime import datetime
 
-
 class Simulator:
 
     def __init__(self,
                  utilization_pct: float,
                  service_rate: float,
                  number_of_rounds: int,
-                 round_size: int,
+                 round_sample_size: int,
                  save_metric_per_round_file: bool = True,
                  save_raw_event_log_file: bool = False):
-        self.__opt_save_metric_per_round_file = save_metric_per_round_file
-        self.__opt_save_raw_event_log_file = save_raw_event_log_file
-
-        #número de filas do sistema
-        self.__number_of_qs: int = 2
-
         #taxa de utilização(rho)
         self.__utilization_pct: float = utilization_pct
 
@@ -42,7 +36,16 @@ class Simulator:
         self.__number_of_rounds: int = number_of_rounds
 
         #número de rodadas da simulação
-        self.__round_size: int = round_size
+        self.__round_sample_size: int = round_sample_size
+
+        #flag para salvar o arquivo de métricas por rodada ao final da simulação
+        self.__opt_save_metric_per_round_file = save_metric_per_round_file
+
+        #flag para salvar o arquivo de log de eventos ao final da simulação
+        self.__opt_save_raw_event_log_file = save_raw_event_log_file
+
+        #número de filas do sistema
+        self.__number_of_qs: int = 2
 
         #rodada atual
         self.__current_round: int = 0
@@ -55,9 +58,6 @@ class Simulator:
         #arquivo onde o log de eventos da simulação serão salvos
         self.__event_log_raw_file: str = './event_log_raw.csv'
 
-    def __reset_simulation_variables(self):
-        """Reseta variáveis de controle para seus valores iniciais."""
-
         #tempo atual da simulação
         self.__current_timestamp = 0.0
 
@@ -66,22 +66,29 @@ class Simulator:
 
         #lista de eventos principal do simulador
         self.__event_q: list[Event] = []
-        """representação das filas de espera do sistema, seguindo o número de filas indicado por self.__number_of_qs"""
+
+        #representação das filas de espera do sistema, seguindo o número de filas indicado por self.__number_of_qs
         self.__waiting_qs = list(
             map(lambda _: list(), range(0, self.__number_of_qs)))
 
+    def __reset_round_control_variables(self):
+        """Reseta variáveis de controle da rodada para seus valores iniciais."""
+        
+        #número de serviços na rodada atual
         self.__served_clients_current_round = 0
 
+        #eventos da rodada atual
         self.__events_current_round: list[Event] = []
 
+        #amostras das métricas que foram colhidas na rodada atual
         self.__metric_samples_current_round: list[Metric] = []
 
-    def __get_estimated_mean_and_std(self, samples: 'list[float]'):
+    def __get_estimated_mean_and_var(self, samples: 'list[float]'):
         est_mean = sum(samples) / len(samples)
-        est_std = sum(map(lambda x:
+        est_var = sum(map(lambda x:
                           (x - est_mean)**2, samples)) / (len(samples) - 1)
 
-        return est_mean, est_std
+        return est_mean, est_var
 
     def __generate_metric_samples(self, metric_list: 'list[MetricType]'):
         for m in metric_list:
@@ -249,70 +256,70 @@ class Simulator:
                 self.__metric_samples_current_round.append(metric)
 
     def __generate_round_metrics(self):
-        w1_est_mean, w1_est_var = self.__get_estimated_mean_and_std(
+        w1_est_mean, w1_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.W1,
                            self.__metric_samples_current_round))))
 
-        w2_est_mean, w2_est_var = self.__get_estimated_mean_and_std(
+        w2_est_mean, w2_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.W2,
                            self.__metric_samples_current_round))))
 
-        x1_est_mean, x1_est_var = self.__get_estimated_mean_and_std(
+        x1_est_mean, x1_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.X1,
                            self.__metric_samples_current_round))))
 
-        x2_est_mean, x2_est_var = self.__get_estimated_mean_and_std(
+        x2_est_mean, x2_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.X2,
                            self.__metric_samples_current_round))))
 
-        t1_est_mean, t1_est_var = self.__get_estimated_mean_and_std(
+        t1_est_mean, t1_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.T1,
                            self.__metric_samples_current_round))))
 
-        t2_est_mean, t2_est_var = self.__get_estimated_mean_and_std(
+        t2_est_mean, t2_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.T2,
                            self.__metric_samples_current_round))))
 
-        nq1_est_mean, nq1_est_var = self.__get_estimated_mean_and_std(
+        nq1_est_mean, nq1_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.NQ1,
                            self.__metric_samples_current_round))))
 
-        nq2_est_mean, nq2_est_var = self.__get_estimated_mean_and_std(
+        nq2_est_mean, nq2_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.NQ2,
                            self.__metric_samples_current_round))))
 
-        n1_est_mean, n1_est_var = self.__get_estimated_mean_and_std(
+        n1_est_mean, n1_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
                     filter(lambda x: x.type == MetricType.N1,
                            self.__metric_samples_current_round))))
 
-        n2_est_mean, n2_est_var = self.__get_estimated_mean_and_std(
+        n2_est_mean, n2_est_var = self.__get_estimated_mean_and_var(
             list(
                 map(
                     lambda x: x.value,
@@ -418,6 +425,7 @@ class Simulator:
             O id do cliente na primeira posição da fila."""
 
         next_client = self.__waiting_qs[queue_number - 1].pop(0)
+
         if (self.__opt_save_raw_event_log_file):
             self.__event_log_raw.append({
                 'reference':
@@ -453,6 +461,13 @@ class Simulator:
             O tempo de serviço restante do serviço interrrompido do cliente.
         in_the_front : bool, optional
             Caso True, insere o cliente na primeira posição da fila."""
+        if (in_the_front):
+            self.__waiting_qs[queue_number - 1].insert(
+                0, (client_id, remaining_service_time))
+        else:
+            self.__waiting_qs[queue_number - 1].append(
+                (client_id, remaining_service_time))
+        
         if (self.__opt_save_raw_event_log_file):
             self.__event_log_raw.append({
                 'reference': 'enqueue',
@@ -463,13 +478,6 @@ class Simulator:
                 'in_the_front': in_the_front,
                 'round': self.__current_round
             })
-
-        if (in_the_front):
-            self.__waiting_qs[queue_number - 1].insert(
-                0, (client_id, remaining_service_time))
-        else:
-            self.__waiting_qs[queue_number - 1].append(
-                (client_id, remaining_service_time))
 
     def __remove_current_service_departure(self):
         """Remove a partida do sistema agendada para o cliente atualmente em serviço.\n
@@ -559,7 +567,7 @@ class Simulator:
         """Agenda a próxima chegada de um cliente ao sistema.\n
         O tempo de chegada do próximo cliente é determinado pela função self.__get_arrival_time."""
 
-        if (self.__served_clients_current_round <= self.__round_size):
+        if (self.__served_clients_current_round <= self.__round_sample_size):
             next_arrival_time = self.__current_timestamp + self.__get_arrival_time(
             )
 
@@ -574,9 +582,6 @@ class Simulator:
         Se o serviço corrente é oriundo da fila de espera 1, o cliente é inserido na fila de espera 1.\n
         Caso o serviço corrente seja oriundo da fila de espera 2, o serviço desse cliente é interrompido(EventType.HALT_SERVICE_2), 
         e o cliente recém chegado inicia o serviço imediatamente."""
-
-        #print(f'Served clients: {self.__served_clients}')
-
         current_client_id, current_source_event_type = self.__get_current_service(
         )
 
@@ -822,9 +827,8 @@ class Simulator:
 
         try:
             for round_number in range(0, self.__number_of_rounds):
+                self.__reset_round_control_variables()
                 self.__current_round = round_number
-                #print(self.__metrics_accumulated)
-                self.__reset_simulation_variables()
 
                 #enfileirando a primeira chegada na fila 1
                 self.__enqueue_event(

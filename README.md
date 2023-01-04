@@ -62,6 +62,12 @@ A representação dos eventos e das métricas também merecem ser destacados. Fo
 
 ## Otimizações
 ## Conclusão
+
+### Dificuldades
+- Coleta de métricas
+
+    Estava fazendo uma coleta de todas as métricas a cada partida. Tive problema, pois algumas métricas(w2, por exemplo) nao estava sendo coletada até que o ciente saísse do sistema.
+- Amostragem
 ### Integrantes do grupo
 - Guilherme Avelino do Nascimento - DRE 117078497
 

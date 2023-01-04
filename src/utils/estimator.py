@@ -18,10 +18,16 @@ class Estimator:
         self.__s2 = self.__s2 + value*value
     
     def mean(self):
-        return self.__s / self.__n
+        if(self.__n > 0):
+            return self.__s / self.__n
+        
+        return 0
 
     def variance(self):
-        return (self.__s2 - (self.__s**2)/self.__n)/(self.__n - 1)
+        if(self.__n > 1):
+            return (self.__s2 - (self.__s**2)/self.__n)/(self.__n - 1)
+        
+        return 0
 
     def std(self):
         return math.sqrt(self.variance())

@@ -18,6 +18,7 @@ from utils.estimator import Estimator
 
 class Simulator:
 
+    ######### Inicialização e controle #########
     def __init__(self,
                  utilization_pct: float,
                  service_rate: float,
@@ -166,6 +167,125 @@ class Simulator:
         for k in self.__metric_estimators_current_round:
             self.__metric_estimators_current_round[k].clear()
 
+    ######### Utilidades #########
+    def __save_event_logs_raw_file(self):
+        """Salva o log de eventos em um arquivo .csv."""
+
+        if (os.path.exists(self.__event_log_raw_file)):
+            os.remove(self.__event_log_raw_file)
+
+        if (len(self.__event_log_raw) > 0):
+            with open(self.__event_log_raw_file, 'a+',
+                      newline='') as output_file:
+
+                fieldnames = [
+                    'round', 'reference', 'type', 'queue_number', 'timestamp',
+                    'client_id', 'remaining_service_time', 'in_the_front'
+                ]
+
+                dict_writer = csv.DictWriter(output_file,
+                                             fieldnames=fieldnames)
+                dict_writer.writeheader()
+                dict_writer.writerows(self.__event_log_raw)
+
+    def __save_metric_per_round_file(self):
+        """Salva as métricas por rodada em um arquivo .csv."""
+
+        file_name = f'{self.__results_folder}/metric_per_round_{datetime.utcnow().timestamp()}.csv'
+
+        if (os.path.exists(file_name)):
+            os.remove(file_name)
+
+        if (len(self.__metrics_per_round) > 0):
+            self.__metrics_per_round.to_csv(file_name,
+                                            sep=',',
+                                            encoding='utf-8',
+                                            index=False)
+
+            print(f'Metric per round file saved at {file_name}')
+
+    def __plot_metrics_per_round(self):
+        title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, round_sample_size={self.__samples_per_round}'
+
+        plt.xlabel('rounds')
+
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.W1)}_est_mean'],
+                 label='E[W1]',
+                 color='blue')
+
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.W1)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='red')
+
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.W2)}_est_mean'],
+                 label='E[W2]',
+                 color='orange')
+        
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.W2)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='black')
+        
+        plt.title(title)
+
+        plt.legend()
+
+        wait_time_file_name = f'{self.__results_folder}/wait_time_plot_{datetime.utcnow().timestamp()}.png'
+
+        plt.savefig(wait_time_file_name)
+
+        plt.close()
+
+        print(f'Wait time plot saved at {wait_time_file_name}')
+
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.NQ1)}_est_mean'],
+                 label='E[NQ1]',
+                 color='blue')
+
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.NQ1)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='red')
+
+        plt.plot(self.__metrics_per_round['round'],
+                 self.__metrics_per_round[f'{str(MetricType.NQ2)}_est_mean'],
+                 label='E[NQ2]',
+                 color='orange')
+        
+        plt.plot(
+            self.__metrics_per_round['round'],
+            list(
+                map(
+                    lambda x: self.__metric_estimators_simulation[
+                        f'{str(MetricType.NQ2)}_est_mean'].mean(),
+                    self.__metrics_per_round['round'])), '--', color='black')
+        
+        plt.title(title)
+
+        plt.legend()
+
+        q_size_file_name = f'{self.__results_folder}/q_size_plot_{datetime.utcnow().timestamp()}.png'
+
+        plt.savefig(q_size_file_name)
+
+        plt.close()
+
+        print(f'Queue size plot saved at {q_size_file_name}')
+    
+    ######### Métricas #########
     def __generate_metric_samples(self, metric_list: 'list[MetricType]'):
         for m in metric_list:
 
@@ -404,6 +524,7 @@ class Simulator:
                 self.__metric_estimators_simulation[k].add_sample(
                     self.__metric_estimators_current_round[tp].variance())
 
+    ######### Geração de VA's #########
     def __get_arrival_time(self):
         """Obtém o tempo de chegada de um novo cliente, a partir de uma distribuição exponencial com taxa self.__arrival_rate.
 
@@ -423,6 +544,7 @@ class Simulator:
             Uma amostra de uma variável exponencial, representando um tempo de serviço."""
         return np.random.exponential(scale=1.0 / self.__service_rate)
 
+    ######### Ciclo de vida do simulador #########
     def __enqueue_event(self, event: Event, in_the_front: bool = False):
         """Insere um evento na lista de eventos.\n
         Os eventos são inseridos de maneira que a lista sempre se mantém ordenada pelo timestamp de ocorrência dos eventos.
@@ -806,121 +928,7 @@ class Simulator:
         self.__generate_metric_samples(
             [MetricType.W2, MetricType.X2, MetricType.T2])
 
-    def __save_event_logs_raw_file(self):
-        """Salva o log de eventos em um arquivo .csv."""
-
-        if (os.path.exists(self.__event_log_raw_file)):
-            os.remove(self.__event_log_raw_file)
-
-        if (len(self.__event_log_raw) > 0):
-            with open(self.__event_log_raw_file, 'a+',
-                      newline='') as output_file:
-
-                fieldnames = [
-                    'round', 'reference', 'type', 'queue_number', 'timestamp',
-                    'client_id', 'remaining_service_time', 'in_the_front'
-                ]
-
-                dict_writer = csv.DictWriter(output_file,
-                                             fieldnames=fieldnames)
-                dict_writer.writeheader()
-                dict_writer.writerows(self.__event_log_raw)
-
-    def __save_metric_per_round_file(self):
-        """Salva as métricas por rodada em um arquivo .csv."""
-
-        file_name = f'{self.__results_folder}/metric_per_round_{datetime.utcnow().timestamp()}.csv'
-
-        if (os.path.exists(file_name)):
-            os.remove(file_name)
-
-        if (len(self.__metrics_per_round) > 0):
-            self.__metrics_per_round.to_csv(file_name,
-                                            sep=',',
-                                            encoding='utf-8',
-                                            index=False)
-
-            print(f'Metric per round file saved at {file_name}')
-
-    def __plot_metrics_per_round(self):
-        title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, round_sample_size={self.__samples_per_round}'
-
-        plt.xlabel('rounds')
-
-        plt.plot(self.__metrics_per_round['round'],
-                 self.__metrics_per_round[f'{str(MetricType.W1)}_est_mean'],
-                 label='E[W1]',
-                 color='blue')
-
-        plt.plot(
-            self.__metrics_per_round['round'],
-            list(
-                map(
-                    lambda x: self.__metric_estimators_simulation[
-                        f'{str(MetricType.W1)}_est_mean'].mean(),
-                    self.__metrics_per_round['round'])), '--', color='red')
-
-        plt.plot(self.__metrics_per_round['round'],
-                 self.__metrics_per_round[f'{str(MetricType.W2)}_est_mean'],
-                 label='E[W2]',
-                 color='orange')
-        
-        plt.plot(
-            self.__metrics_per_round['round'],
-            list(
-                map(
-                    lambda x: self.__metric_estimators_simulation[
-                        f'{str(MetricType.W2)}_est_mean'].mean(),
-                    self.__metrics_per_round['round'])), '--', color='black')
-        
-        plt.title(title)
-
-        plt.legend()
-
-        wait_time_file_name = f'{self.__results_folder}/wait_time_plot_{datetime.utcnow().timestamp()}.png'
-
-        plt.savefig(wait_time_file_name)
-
-        plt.close()
-
-        print(f'Wait time plot saved at {wait_time_file_name}')
-
-        plt.plot(self.__metrics_per_round['round'],
-                 self.__metrics_per_round[f'{str(MetricType.NQ1)}_est_mean'],
-                 label='E[NQ1]',
-                 color='blue')
-
-        plt.plot(
-            self.__metrics_per_round['round'],
-            list(
-                map(
-                    lambda x: self.__metric_estimators_simulation[
-                        f'{str(MetricType.NQ1)}_est_mean'].mean(),
-                    self.__metrics_per_round['round'])), '--', color='red')
-
-        plt.plot(self.__metrics_per_round['round'],
-                 self.__metrics_per_round[f'{str(MetricType.NQ2)}_est_mean'],
-                 label='E[NQ2]',
-                 color='orange')
-        
-        plt.plot(
-            self.__metrics_per_round['round'],
-            list(
-                map(
-                    lambda x: self.__metric_estimators_simulation[
-                        f'{str(MetricType.NQ2)}_est_mean'].mean(),
-                    self.__metrics_per_round['round'])), '--', color='black')
-        
-        plt.title(title)
-
-        plt.legend()
-
-        q_size_file_name = f'{self.__results_folder}/q_size_plot_{datetime.utcnow().timestamp()}.png'
-
-        plt.savefig(q_size_file_name)
-
-        print(f'Queue size plot saved at {q_size_file_name}')
-
+    ######### Loop principal #########
     def run(self):
         """Loop principal do simulador.\n
         Remove-se o evento na primeira posição da lista de eventos, e delega-se para a função de tratamento adequada.

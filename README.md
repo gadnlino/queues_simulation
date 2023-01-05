@@ -67,7 +67,11 @@ A representação dos eventos e das métricas também merecem ser destacados. Fo
 - Coleta de métricas
 
     Estava fazendo uma coleta de todas as métricas a cada partida. Tive problema, pois algumas métricas(w2, por exemplo) nao estava sendo coletada até que o ciente saísse do sistema.
+    
+    Tenho que coletar depois dos eventos de partida do sistema, pois se olhar para a chegada somente, não terei as métricas relativas à fila de menor prioridade.
 - Amostragem
+
+    Não pude usar sistema se cores a cada chegada na rodada pois, na minha implemenmtação, certas métricas só podiam ser calculadas no momento da partida do cliente(W2 e X2, por exemplo). Com isso, determinei que uma rodada avançaria quando k clientes tiverem a sua partida do sistema.
 ### Integrantes do grupo
 - Guilherme Avelino do Nascimento - DRE 117078497
 

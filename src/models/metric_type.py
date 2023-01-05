@@ -8,6 +8,8 @@ class MetricType(Enum):
     W2 = "W2"
     X1 = "X1"
     X2 = "X2"
+    T1 = "T1"
+    T2 = "T2"
     NQ1 = "NQ1"
     NQ2 = "NQ2"
     N1 = "N1"

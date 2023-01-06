@@ -470,6 +470,14 @@ class Simulator:
             self.__metric_estimators_current_round[str(
                 MetricType.N2)].add_sample(nq2)
 
+    def __calculate_covariance(self,):
+        mean_cols = list(filter(lambda x: str(x).endswith('_est_mean'), list(self.__metrics_per_round.columns)))
+        
+        for col in mean_cols:
+            new_col_name = f'{col.replace("_est_mean", "")}_cov'
+            for i in range(1, self.__number_of_rounds):
+                self.__metrics_per_round.loc[i, new_col_name] = np.cov(self.__metrics_per_round[col][0:i+1])
+
     ######### Geração de VA's #########
     def __get_arrival_time(self):
         """Obtém o tempo de chegada de um novo cliente, a partir de uma distribuição exponencial com taxa self.__arrival_rate.
@@ -1102,7 +1110,10 @@ class Simulator:
                 elif (event.type == EventType.DEPARTURE):
                     self.__handle_departure(event)
 
-            self.__generate_round_metrics()
+            self.__calculate_covariance()
+
+            #ordenando colunas no arquivo csv por nome
+            self.__metrics_per_round = self.__metrics_per_round[['round'] + sorted(list(filter(lambda x: x != 'round', list(self.__metrics_per_round.columns))))]
 
             finished_success = True
         finally:

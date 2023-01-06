@@ -277,7 +277,7 @@ class Simulator:
 
     def __plot_metrics_per_round(self):
         """Gera um gráfico com as a evolução das métricas E[NQ1], E[NQ2], E[W1], E[W2]."""
-        title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, samples_per_round={self.__samples_per_round}'
+        title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, samples_per_round={self.__samples_per_round}, services_until_steady_state={self.__services_until_steady_state}'
 
         plt.xlabel('rounds')
 
@@ -474,10 +474,11 @@ class Simulator:
         mean_cols = list(filter(lambda x: str(x).endswith('_est_mean'), list(self.__metrics_per_round.columns)))
         
         for col in mean_cols:
-            new_col_name = f'{col.replace("_est_mean", "")}_cov'
+            metric_name = col.replace("_est_mean", "")
             for i in range(1, self.__number_of_rounds):
-                self.__metrics_per_round.loc[i, new_col_name] = np.cov(self.__metrics_per_round[col][0:i+1])
-
+                cov = np.cov(self.__metrics_per_round[col][0:i+1])
+                self.__metrics_per_round.loc[i, f'{metric_name}_cov'] = cov
+                self.__metrics_per_round.loc[i, f'{metric_name}_cov_var'] = cov / self.__metrics_per_round.loc[i, f'{metric_name}_est_var']
     ######### Geração de VA's #########
     def __get_arrival_time(self):
         """Obtém o tempo de chegada de um novo cliente, a partir de uma distribuição exponencial com taxa self.__arrival_rate.

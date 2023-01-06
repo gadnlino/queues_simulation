@@ -129,5 +129,4 @@ dmypy.json
 .pyre/
 event_history.json
 *.json
-*.csv
 results_*

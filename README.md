@@ -94,6 +94,16 @@ De maneira geral, observou-se que com 10000 serviços executados(`number_of_roun
 
 [rho = 0.4](./images/wait_time_10000_services_lambda_04.png)
 
+Com relação ao número ótimo de amostras por rodada, após algumas simulações com diferentes valores, foi observado que com k = 50 amostras por rodada fornecia um resultado razoável em relação à variancia e oferecendo um tempo de simulação mais rápido do que com quantidades maiores. Abaixo estão alguns resultados com diferentes valores de k(observar as colunas terminadas por '_cov_var').
+
+[k = 50](./files/metric_per_round_k_50.csv)
+
+[k = 100](./files/metric_per_round_k_100.csv)
+
+[k = 200](./files/metric_per_round_k_200.csv)
+
+[k = 1000](./files/metric_per_round_k_1000.csv)
+
 ## Análise dos resultados
 
 //TODO:

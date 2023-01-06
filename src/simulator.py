@@ -69,9 +69,11 @@ class Simulator:
     ######### Inicialização e variváveis de controle #########
     def __init__(self,
                  arrival_process: str = 'exponential',
+                 inter_arrival_time : float = None,
                  utilization_pct: float = 0.5,
                  service_process: str = 'exponential',
                  service_rate: float = 1.0,
+                 service_time: float = None,
                  number_of_rounds: int = 5,
                  samples_per_round: int = 5,
                  services_until_steady_state: int = 0,
@@ -83,21 +85,26 @@ class Simulator:
         self.__simulation_running = False
         """Variável de controle para o loop principal do simulador."""
 
+        self.__service_process = service_process
+        """Processos de serviço(determinístico ou exponencial)."""
+
         self.__utilization_pct: float = utilization_pct
         """Taxa de utilização(rho)."""
 
-        self.__arrival_rule = arrival_process
-        """Tipos de chegada(determinística ou exponencial)."""
-
-        self.__service_rate: float = service_rate
-        """Taxa de serviço(mu)."""
-
-        self.__service_rule = service_process
-        """Tipos de serviço(determinístico ou exponencial)."""
-
-        self.__arrival_rate: float = (self.__utilization_pct *
-                                      self.__service_rate)
-        """Taxa de chegada(lambda)(é obtida a partir das taxas de serviço e utilização, pela formula utilization_pct = (arrival_rate/service_rate))"""
+        if(self.__service_process == 'exponential'):
+            self.__service_rate: float = service_rate
+            """Taxa de serviço(mu)."""
+        else:
+            self.__service_time = service_time
+        
+        self.__arrival_process = arrival_process
+        """Processos de chegada de chegada(determinística ou exponencial)."""
+        if(self.__arrival_process == 'exponential'):
+            self.__arrival_rate: float = (self.__utilization_pct *
+                                        self.__service_rate)
+            """Taxa de chegada(lambda)(é obtida a partir das taxas de serviço e utilização, pela formula utilization_pct = (arrival_rate/service_rate))"""
+        elif(self.__arrival_process == 'deterministic'):
+            self.__inter_arrival_time = inter_arrival_time
 
         self.__number_of_rounds: int = number_of_rounds
         """Número de rodadas da simulação"""
@@ -277,7 +284,17 @@ class Simulator:
 
     def __plot_metrics_per_round(self):
         """Gera um gráfico com as a evolução das métricas E[NQ1], E[NQ2], E[W1], E[W2]."""
-        title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, samples_per_round={self.__samples_per_round}, services_until_steady_state={self.__services_until_steady_state}'
+        
+        def build_title():
+            title = ''
+            if(self.__service_process == 'exponential' and self.__arrival_process == 'exponential'):
+                title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, samples_per_round={self.__samples_per_round}, services_until_steady_state={self.__services_until_steady_state}'
+            elif(self.__service_process == 'deterministic' and self.__arrival_process == 'deterministic'):
+                title = f'service_time={self.__service_time},inter_arrival_time={self.__inter_arrival_time}, samples_per_round={self.__samples_per_round}, services_until_steady_state={self.__services_until_steady_state}'
+            
+            return title
+        
+        title = build_title()
 
         plt.xlabel('rounds')
 
@@ -488,12 +505,12 @@ class Simulator:
         time: float
             Uma amostra de uma variável exponencial, representando um tempo de chegada."""
 
-        if (self.__arrival_rule == 'exponential'):
+        if (self.__arrival_process == 'exponential'):
             u = random.random()
             return math.log(u) / (-self.__arrival_rate)
             #return np.random.exponential(scale=1.0 / self.__arrival_rate)
-        elif (self.__arrival_rule == 'deterministic'):
-            return self.__arrival_rate
+        elif (self.__arrival_process == 'deterministic'):
+            return self.__inter_arrival_time
 
     def __get_service_time(self):
         """Obtém o tempo de serviço de um cliente, a partir de uma distribuição exponencial com taxa self.__service_rate.
@@ -503,12 +520,12 @@ class Simulator:
         time: float
             Uma amostra de uma variável exponencial, representando um tempo de serviço."""
 
-        if (self.__service_rule == 'exponential'):
+        if (self.__service_process == 'exponential'):
             u = random.random()
             return math.log(u) / (-self.__service_rate)
             #return np.random.exponential(scale=1.0 / self.__service_rate)
-        elif (self.__service_rule == 'deterministic'):
-            return self.__service_rate
+        elif (self.__service_process == 'deterministic'):
+            return self.__service_time
 
     ######### Ciclo de vida do simulador #########
     def __enqueue_event(self, event: Event, in_the_front: bool = False):

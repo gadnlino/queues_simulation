@@ -76,7 +76,7 @@ Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é 
 
 ## Teste de correção dos resultados
 
-Foram realizadas execuções com o processo de chegada e de serviço determinísticos
+Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Pela forma como foi configurada da rede de filas do problema e a prioridade preemptiva, para a fila convergir com os tempos determinísticos é necessário que o cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema.
 
 //TODO: corrigir implementação determinística
 

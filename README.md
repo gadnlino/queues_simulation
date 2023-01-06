@@ -76,12 +76,31 @@ Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é 
 
 ## Teste de correção dos resultados
 
+Foram realizadas execuções com o processo de chegada e de serviço determinísticos
+
+//TODO: corrigir implementação determinística
+
 ## Determinando a fase transiente
 
+Conforme o enunciado da tarefa, a equação de equilibrio para esse sistema é $$2\lambda = {\mu}$$
+
+Então, para $$\rho = 1$$, posso deduzir analiticamente que o sistema permanece em equilíbrio para taxas de chegada até 0.5. Esse valor será mencionado mais adiante na seção **Conclusão**.
+
+Dado isso, analisei o número de serviços executados pelo sistema até que entrasse em equilibrio, para diferentes taxas até essa taxa de serviço crítica, incrementando o número de rodadas e o número de serviços por rodada, e configurando o número de serviços até a fase transiente para 0 nas configurações do simulador.
+
+De maneira geral, observou-se que com 10000 serviços executados(`number_of_rounds`=200, `samples_per_round`=50, `services_until_steady_state`=0), o sistema já se encontrava em equilibrio para as taxas de utilização menores do que 0.5:
+
+[rho = 0.2](./images/wait_time_10000_services_lambda_02.png)
+
+[rho = 0.4](./images/wait_time_10000_services_lambda_04.png)
+
 ## Análise dos resultados
+
+//TODO:
 ### Chegando ao fator mínimo
 
 ## Otimizações
+//TODO:
 ## Conclusão
 
 Ao executar a simulação para os diferentes valores da taxa de utilização, fica claro a relação entre essa taxa e a convergência da fila para um estado de equilibrio; Ao executar com taxas maiores do que 0.5, o número de clientes na fila 2 e o tempo de espera médio aumentam indefinidamente!
@@ -103,8 +122,9 @@ Ao executar a simulação para os diferentes valores da taxa de utilização, fi
 
     Como calculo o número de rodadas previamente, tendo uma precisão alvo para o intervalo de confiança?
 
-
 ## Instruções para execução do simulador
+
+//TODO:
 
 ## Integrantes do grupo
 - Guilherme Avelino do Nascimento - DRE 117078497

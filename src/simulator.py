@@ -28,56 +28,165 @@ EVENT_TYPES = [
 
 #E[T1], E[W1], E[N1], E[Nq1], E[T2], E[W2], E[N2],E[Nq2], V[W1], e V[W2]
 
+
 class Simulator:
+    """Parameters
+        ----------
+        arrival_process : str
+            O processo de chegada de clientes ao sistema. Valores: 'exponential', 'deterministic'.
+        
+        utilization_pct: float
+            A porcentagem de utilização do sistema(rho).
+        
+        service_process: str
+            O processo de serviço do sistema. Valores: 'exponential', 'deterministic'.
+        
+        service_rate: float
+            A taxa de serviço do sistema(mu).
+        
+        number_of_rounds: int
+            O número de rodadas da simulação.
+        
+        samples_per_round: int
+            O número de amostras que serão coletadas a cada rodada de simulação.
+        
+        services_until_steady_state: int
+            O número de serviços executados no sistema(ciclo completo de um cliente no sistema) até atingir o estado de equilíbrio no sistema.
+        
+        seed: int
+            A semente inicial para geração de variáveis aleatórias no sistema.
+        
+        save_metric_per_round_file: bool
+            Caso True, salva um arquivo .csv com a evolução das métricas por rodada.
+        
+        save_raw_event_log_file: bool
+            Caso True, salva um arquivo .csv com todos os eventos da simulação(para depuração).
+        
+        plot_metrics_per_round: bool
+            Caso True, gera gráficos com o tempo de espera médio e o número médio de clientes em cada fila.
+        """
 
     ######### Inicialização e variváveis de controle #########
     def __init__(self,
-                 utilization_pct: float,
-                 service_rate: float,
-                 number_of_rounds: int,
-                 samples_per_round: int,
-                 arrivals_until_steady_state: int,
+                 arrival_process: str = 'exponential',
+                 utilization_pct: float = 0.5,
+                 service_process: str = 'exponential',
+                 service_rate: float = 1.0,
+                 number_of_rounds: int = 5,
+                 samples_per_round: int = 5,
+                 services_until_steady_state: int = 0,
                  seed: int = None,
                  save_metric_per_round_file: bool = True,
                  save_raw_event_log_file: bool = False,
-                 plot_metrics_per_round=False):
-        #taxa de utilização(rho)
+                 plot_metrics_per_round: bool=False):
+
+        self.__simulation_running = False
+        """Variável de controle para o loop principal do simulador."""
+
         self.__utilization_pct: float = utilization_pct
+        """Taxa de utilização(rho)."""
 
-        #taxa de serviço(definido no enunciado do trabalho)
+        self.__arrival_rule = arrival_process
+        """Tipos de chegada(determinística ou exponencial)."""
+
         self.__service_rate: float = service_rate
+        """Taxa de serviço(mu)."""
 
-        #taxa de chegada(é obtida a partir das taxas de serviço e utilização, pela formula utilization_pct = (arrival_rate/service_rate))
+        self.__service_rule = service_process
+        """Tipos de serviço(determinístico ou exponencial)."""
+
         self.__arrival_rate: float = (self.__utilization_pct *
                                       self.__service_rate)
+        """Taxa de chegada(lambda)(é obtida a partir das taxas de serviço e utilização, pela formula utilization_pct = (arrival_rate/service_rate))"""
 
-        #número de rodadas da simulação
         self.__number_of_rounds: int = number_of_rounds
+        """Número de rodadas da simulação"""
 
-        #número de amostras por rodada
         self.__samples_per_round: int = samples_per_round
+        """Número de amostras por rodada"""
 
-        #número de chegadas da fase transiente
-        self.__arrivals_until_steady_state = arrivals_until_steady_state
+        self.__services_until_steady_state = services_until_steady_state
+        """Número de serviços da fase transiente"""
 
-        #flag para salvar o arquivo de métricas por rodada ao final da simulação
-        self.__opt_save_metric_per_round_file = save_metric_per_round_file
-
-        #flag para salvar o arquivo de log de eventos ao final da simulação
-        self.__opt_save_raw_event_log_file = save_raw_event_log_file
-
-        #flag para plotar um gráfico com a evolução das métricas ao final da simulação
-        self.__opt_plot_metrics_per_round = plot_metrics_per_round
+        self.__seed = seed
+        """Seed para geração de variáveis aleatórias da simulação."""
 
         if (seed != None):
-            #setando seed do sistema
-            np.random.seed(seed=seed)
+            #setando seed para a simulação
+            np.random.seed(seed=self.__seed)
 
-        #número de filas do sistema
         self.__number_of_qs: int = 2
+        """Número de filas do sistema"""
 
-        #rodada atual
         self.__current_round: int = 0
+        """Rodada atual"""
+
+        self.__current_timestamp = 0.0
+        """Tempo atual da simulação"""
+
+        self.__current_service = None
+        """Cliente atualmente em serviço"""
+
+        self.__event_q: list[Event] = []
+        """Lista de eventos principal do simulador"""
+
+        self.__waiting_qs = list(
+            map(lambda _: list(), range(0, self.__number_of_qs)))
+        """Representação das filas de espera do sistema, seguindo o número de filas indicado por self.__number_of_qs"""
+
+        self.__clients_in_system = {}
+        """Todos os clientes presentes no sistema"""
+
+        self.__number_of_arrivals = 0
+        """Número de chegadas no sistema"""
+
+        self.__number_of_departures = 0
+        """Número de partidas do sistema"""
+
+        self.__collected_samples_current_round = 0
+        """Número de amostras coletadas na rodada atual"""
+
+        self.__collected_samples_simulation = 0
+        """Número de amostras coletadas em toda a simulação"""
+
+        self.__steady_state = False
+        """Indicador de estado de equilíbrio"""
+
+        self.__metric_estimators_current_round = {
+            str(MetricType.W1): Estimator(),
+            str(MetricType.W2): Estimator(),
+            str(MetricType.X1): Estimator(),
+            str(MetricType.X2): Estimator(),
+            str(MetricType.T1): Estimator(),
+            str(MetricType.T2): Estimator(),
+            str(MetricType.NQ1): Estimator(),
+            str(MetricType.NQ2): Estimator(),
+            str(MetricType.N1): Estimator(),
+            str(MetricType.N2): Estimator(),
+        }
+        """Estimadores das métricas de uma rodada da simulação.
+        Serão incrementados a cada partida"""
+
+        self.__metric_estimators_simulation = {
+            f'{str(MetricType.W1)}_est_mean': Estimator(),
+            f'{str(MetricType.W1)}_est_var': Estimator(),
+            f'{str(MetricType.W2)}_est_mean': Estimator(),
+            f'{str(MetricType.W2)}_est_var': Estimator(),
+            f'{str(MetricType.X1)}_est_mean': Estimator(),
+            f'{str(MetricType.X1)}_est_var': Estimator(),
+            f'{str(MetricType.X2)}_est_mean': Estimator(),
+            f'{str(MetricType.X2)}_est_var': Estimator(),
+            f'{str(MetricType.NQ1)}_est_mean': Estimator(),
+            f'{str(MetricType.NQ1)}_est_var': Estimator(),
+            f'{str(MetricType.NQ2)}_est_mean': Estimator(),
+            f'{str(MetricType.NQ2)}_est_var': Estimator(),
+            f'{str(MetricType.N1)}_est_mean': Estimator(),
+            f'{str(MetricType.N1)}_est_var': Estimator(),
+            f'{str(MetricType.N2)}_est_mean': Estimator(),
+            f'{str(MetricType.N2)}_est_var': Estimator(),
+        }
+        """Estimadores para métricas alvo da simulação.
+        Serão incrementados ao final de cada rodada."""
 
         self.__metrics_per_round = pd.DataFrame(columns=[
             'round',
@@ -98,103 +207,35 @@ class Simulator:
             f'{str(MetricType.N2)}_est_mean',
             f'{str(MetricType.N2)}_est_var',
         ])
+        """Dataframe com o registro de todas as métricas alvo da simulação a cada rodada.
+        É usado para gerar um arquivo csv com esses dados ao final da simulação."""
 
-        #log de eventos(para depuração posterior)
+        self.__opt_save_metric_per_round_file = save_metric_per_round_file
+        """Flag para salvar o arquivo de métricas por rodada ao final da simulação"""
+
+        self.__opt_save_raw_event_log_file = save_raw_event_log_file
+        """Flag para salvar o arquivo de log de eventos ao final da simulação"""
+
+        self.__opt_plot_metrics_per_round = plot_metrics_per_round
+        """Flag para plotar um gráfico com a evolução das métricas ao final da simulação"""
+
         self.__event_log_raw = []
+        """Log de eventos(para depuração posterior)."""
 
-        #tempo atual da simulação
-        self.__current_timestamp = 0.0
-
-        #cliente atualmente em serviço
-        self.__current_service = None
-
-        #lista de eventos principal do simulador
-        self.__event_q: list[Event] = []
-
-        #representação das filas de espera do sistema, seguindo o número de filas indicado por self.__number_of_qs
-        self.__waiting_qs = list(
-            map(lambda _: list(), range(0, self.__number_of_qs)))
-
-        #todos os clientes presentes no sistema
-        self.__clients_in_system = {}
-
-        #número de chegadas no sistema
-        self.__number_of_arrivals = 0
-
-        #número de partidas do sistema
-        self.__number_of_departures = 0
-
-        #número de amostras coletadas em toda a simulação
-        self.__collected_samples_simulation = 0
-
-        #estimadores das métricas de uma rodada da simulação
-        #serão utilizados para gerar, a cada rodada, as métricas gerais da simulação
-        self.__metric_estimators_current_round = {
-            str(MetricType.W1): Estimator(),
-            str(MetricType.W2): Estimator(),
-            str(MetricType.X1): Estimator(),
-            str(MetricType.X2): Estimator(),
-            str(MetricType.T1): Estimator(),
-            str(MetricType.T2): Estimator(),
-            str(MetricType.NQ1): Estimator(),
-            str(MetricType.NQ2): Estimator(),
-            str(MetricType.N1): Estimator(),
-            str(MetricType.N2): Estimator(),
-        }
-
-        #estimadores para métricas alvo da simulação
-        #serão incrementados a cada rodada
-        self.__metric_estimators_simulation = {
-            f'{str(MetricType.W1)}_est_mean': Estimator(),
-            f'{str(MetricType.W1)}_est_var': Estimator(),
-            f'{str(MetricType.W2)}_est_mean': Estimator(),
-            f'{str(MetricType.W2)}_est_var': Estimator(),
-            f'{str(MetricType.X1)}_est_mean': Estimator(),
-            f'{str(MetricType.X1)}_est_var': Estimator(),
-            f'{str(MetricType.X2)}_est_mean': Estimator(),
-            f'{str(MetricType.X2)}_est_var': Estimator(),
-            f'{str(MetricType.NQ1)}_est_mean': Estimator(),
-            f'{str(MetricType.NQ1)}_est_var': Estimator(),
-            f'{str(MetricType.NQ2)}_est_mean': Estimator(),
-            f'{str(MetricType.NQ2)}_est_var': Estimator(),
-            f'{str(MetricType.N1)}_est_mean': Estimator(),
-            f'{str(MetricType.N1)}_est_var': Estimator(),
-            f'{str(MetricType.N2)}_est_mean': Estimator(),
-            f'{str(MetricType.N2)}_est_var': Estimator(),
-        }
-
-        #pasta onde os arquivos de resultado da simulação serão salvos
         self.__results_folder = f'./results_{str(datetime.utcnow().timestamp()).replace(".", "")}'
+        """Pasta onde os arquivos de resultado da simulação serão salvos"""
 
-        #arquivo onde o log de eventos da simulação serão salvos
         self.__event_log_raw_file: str = f'{self.__results_folder}/event_log_raw.csv'
-
-        #número de serviços na rodada atual
-        self.__collected_samples_current_round = 0
-
-        #eventos da rodada atual
-        self.__events_current_round: list[Event] = []
-
-        #amostras das métricas que foram colhidas na rodada atual
-        self.__metric_samples_current_round: list[Metric] = []
-
-        #cor da rodada
-        self.__current_round_color = None
+        """Arquivo onde o log de eventos da simulação serão salvos"""
 
     def __reset_round_control_variables(self):
         """Reseta variáveis de controle da rodada para seus valores iniciais."""
 
         self.__collected_samples_current_round = 0
 
-        #self.__events_current_round.clear()
-
-        self.__metric_samples_current_round.clear()
-
         #reseta o estimador de todas as métricas da rodada para os valores iniciais
         for k in self.__metric_estimators_current_round:
             self.__metric_estimators_current_round[k].clear()
-
-        self.__current_round_color = None
 
     ######### Utilidades #########
     def __save_event_logs_raw_file(self):
@@ -218,7 +259,7 @@ class Simulator:
                 dict_writer.writerows(self.__event_log_raw)
 
     def __save_metric_per_round_file(self):
-        """Salva as métricas por rodada em um arquivo .csv."""
+        """Salva as métricas de todas as rodadas em um arquivo .csv."""
 
         file_name = f'{self.__results_folder}/metric_per_round_{datetime.utcnow().timestamp()}.csv'
 
@@ -231,9 +272,10 @@ class Simulator:
                                             encoding='utf-8',
                                             index=False)
 
-            print(f'Metric per round file saved at {file_name}')
+            self.__debug_print(f'Metric per round file saved at {file_name}')
 
     def __plot_metrics_per_round(self):
+        """Gera um gráfico com as a evolução das métricas E[NQ1], E[NQ2], E[W1], E[W2]."""
         title = f'rho={self.__utilization_pct}, mu={self.__service_rate}, lambda={self.__arrival_rate}, samples_per_round={self.__samples_per_round}'
 
         plt.xlabel('rounds')
@@ -276,7 +318,7 @@ class Simulator:
 
         plt.close()
 
-        print(f'Wait time plot saved at {wait_time_file_name}')
+        self.__debug_print(f'Wait time plot saved at {wait_time_file_name}')
 
         plt.plot(self.__metrics_per_round['round'],
                  self.__metrics_per_round[f'{str(MetricType.NQ1)}_est_mean'],
@@ -316,146 +358,16 @@ class Simulator:
 
         plt.close()
 
-        print(f'Queue size plot saved at {q_size_file_name}')
+        self.__debug_print(f'Queue size plot saved at {q_size_file_name}')
 
-    def __should_collect_metric(self, client_id: int):
-        if (self.__number_of_arrivals < self.__arrivals_until_steady_state):
-            return False
-
-        client_color = self.__get_client_color(client_id)
-
-        return client_color == self.__current_round_color
+    def __debug_print(self, message: str):
+        """Função utilitária para prints no console."""
+        now = datetime.now()
+        print(f'{now.strftime("%d/%m/%Y, %H:%M:%S")} | {message}')
 
     ######### Métricas #########
-    def __generate_metric_samples(self, client_id: int,
-                                  metric_type_list: 'list[MetricType]'):
-
-        if (client_id != None
-                and not self.__should_collect_metric(client_id=client_id)):
-            return
-
-        for m in metric_type_list:
-            metric = None
-
-            if (m == MetricType.W1):
-                queue_number = 1
-
-                client_arrival = list(
-                    filter(
-                        lambda x: x.type == EventType.ARRIVAL and x.client_id
-                        == client_id, self.__events_current_round))
-
-                client_start_service_1 = list(
-                    filter(
-                        lambda x: x.type == EventType.START_SERVICE_1 and x.
-                        client_id == client_id, self.__events_current_round))
-
-                value = client_start_service_1[0].timestamp - client_arrival[
-                    0].timestamp
-                metric = Metric(MetricType.W1, value, self.__current_timestamp,
-                                queue_number, client_id)
-            elif (m == MetricType.X1):
-                queue_number = 1
-                end_service_1 = list(
-                    filter(
-                        lambda x: x.type == EventType.END_SERVICE_1 and x.
-                        client_id == client_id,
-                        self.__events_current_round))[0]
-
-                start_service_1 = list(
-                    filter(
-                        lambda x: x.type == EventType.START_SERVICE_1 and x.
-                        client_id == client_id,
-                        self.__events_current_round))[0]
-                value = (end_service_1.timestamp - start_service_1.timestamp)
-                metric = Metric(MetricType.X1, value, self.__current_timestamp,
-                                queue_number, client_id)
-            elif (m == MetricType.NQ1):
-                queue_number = 1
-                value = self.__get_waiting_q_size(queue_number)
-                metric = Metric(MetricType.NQ1, value,
-                                self.__current_timestamp, queue_number)
-            elif (m == MetricType.N1):
-                queue_number = 1
-                value = self.__get_waiting_q_size(queue_number)
-
-                _, current_event = self.__get_current_service()
-
-                if (current_event == EventType.START_SERVICE_1):
-                    value = value + 1
-
-                metric = Metric(MetricType.N1, value, self.__current_timestamp,
-                                queue_number)
-            elif (m == MetricType.W2):
-                queue_number = 2
-
-                events_last_departed_client = list(
-                    filter(
-                        lambda x: x.client_id == client_id and x.type in [
-                            EventType.END_SERVICE_1, EventType.START_SERVICE_2,
-                            EventType.HALT_SERVICE_2, EventType.DEPARTURE
-                        ], self.__events_current_round))
-                events_last_departed_client.sort(key=lambda x: x.timestamp)
-
-                value = 0
-
-                for i in range(0, len(events_last_departed_client)):
-                    if (events_last_departed_client[i].type
-                            in [EventType.START_SERVICE_2]):
-                        idle_interval = events_last_departed_client[
-                            i].timestamp - events_last_departed_client[
-                                i - 1].timestamp
-                        value = value + idle_interval
-
-                metric = Metric(MetricType.W2, value, self.__current_timestamp,
-                                queue_number, client_id)
-            elif (m == MetricType.X2):
-                queue_number = 2
-
-                events_last_departed_client = list(
-                    filter(
-                        lambda x: x.client_id == client_id and x.type in [
-                            EventType.START_SERVICE_2, EventType.
-                            HALT_SERVICE_2, EventType.DEPARTURE
-                        ], self.__events_current_round))
-                events_last_departed_client.sort(key=lambda x: x.timestamp)
-
-                value = 0
-
-                for i in range(0, len(events_last_departed_client)):
-                    if (events_last_departed_client[i].type
-                            in [EventType.HALT_SERVICE_2,
-                                EventType.DEPARTURE]):
-                        idle_interval = events_last_departed_client[
-                            i].timestamp - events_last_departed_client[
-                                i - 1].timestamp
-                        value = value + idle_interval
-
-                metric = Metric(MetricType.X2, value, self.__current_timestamp,
-                                queue_number, client_id)
-            elif (m == MetricType.NQ2):
-                queue_number = 2
-                value = self.__get_waiting_q_size(queue_number)
-                metric = Metric(MetricType.NQ2, value,
-                                self.__current_timestamp, queue_number)
-            elif (m == MetricType.N2):
-                queue_number = 2
-                value = self.__get_waiting_q_size(queue_number)
-
-                _, current_event = self.__get_current_service()
-
-                if (current_event == EventType.START_SERVICE_2):
-                    value = value + 1
-
-                metric = Metric(MetricType.N2, value, self.__current_timestamp,
-                                queue_number)
-
-            if (metric != None):
-                self.__metric_estimators_current_round[str(
-                    metric.type)].add_sample(metric.value)
-                self.__metric_samples_current_round.append(metric)
-
     def __generate_round_metrics(self):
+        """Gera as métricas da rodada(média e variância) para todos os valores observados na rodada."""
         current_round_metrics = {
             'round':
             self.__current_round,
@@ -524,6 +436,39 @@ class Simulator:
                 self.__metric_estimators_simulation[k].add_sample(
                     self.__metric_estimators_current_round[tp].variance())
 
+    def __generate_q_size_metrics(self):
+        """Coleta as métricas E[NQ1], E[NQ2], E[N1], E[N2]"""
+        if (not self.__steady_state):
+            return
+
+        _, current_source_event_type = self.__get_current_service()
+        nq1 = self.__get_waiting_q_size(1)
+        nq2 = self.__get_waiting_q_size(2)
+
+        self.__metric_estimators_current_round[str(
+            MetricType.NQ1)].add_sample(nq1)
+
+        self.__metric_estimators_current_round[str(
+            MetricType.NQ2)].add_sample(nq2)
+
+        if (current_source_event_type != None
+                and current_source_event_type == EventType.START_SERVICE_1):
+            self.__metric_estimators_current_round[str(
+                MetricType.N1)].add_sample(nq1 + 1)
+            self.__metric_estimators_current_round[str(
+                MetricType.N2)].add_sample(nq2)
+        elif (current_source_event_type != None
+              and current_source_event_type == EventType.START_SERVICE_2):
+            self.__metric_estimators_current_round[str(
+                MetricType.N1)].add_sample(nq1)
+            self.__metric_estimators_current_round[str(
+                MetricType.N2)].add_sample(nq2 + 1)
+        else:
+            self.__metric_estimators_current_round[str(
+                MetricType.N1)].add_sample(nq1)
+            self.__metric_estimators_current_round[str(
+                MetricType.N2)].add_sample(nq2)
+
     ######### Geração de VA's #########
     def __get_arrival_time(self):
         """Obtém o tempo de chegada de um novo cliente, a partir de uma distribuição exponencial com taxa self.__arrival_rate.
@@ -533,7 +478,10 @@ class Simulator:
         time: float
             Uma amostra de uma variável exponencial, representando um tempo de chegada."""
 
-        return np.random.exponential(scale=1.0 / self.__arrival_rate)
+        if (self.__arrival_rule == 'exponential'):
+            return np.random.exponential(scale=1.0 / self.__arrival_rate)
+        elif (self.__arrival_rule == 'deterministic'):
+            return self.__arrival_rate
 
     def __get_service_time(self):
         """Obtém o tempo de serviço de um cliente, a partir de uma distribuição exponencial com taxa self.__service_rate.
@@ -542,11 +490,11 @@ class Simulator:
         ----------
         time: float
             Uma amostra de uma variável exponencial, representando um tempo de serviço."""
-        return np.random.exponential(scale=1.0 / self.__service_rate)
 
-    def __generate_color(self):
-        color = "%06x" % random.randint(0, 0xFFFFFF)
-        return color
+        if (self.__service_rule == 'exponential'):
+            return np.random.exponential(scale=1.0 / self.__service_rate)
+        elif (self.__service_rule == 'deterministic'):
+            return self.__service_rate
 
     ######### Ciclo de vida do simulador #########
     def __enqueue_event(self, event: Event, in_the_front: bool = False):
@@ -573,8 +521,6 @@ class Simulator:
         event: Event
             O evento na primeira posição da lista."""
         event = self.__event_q.pop(0)
-
-        self.__events_current_round.append(event)
 
         if (self.__opt_save_raw_event_log_file):
             self.__event_log_raw.append({
@@ -667,16 +613,67 @@ class Simulator:
 
         self.__event_q.remove(departures_current_service[0])
 
-    def __add_client_in_system(self, client_id: str, client_color: str):
+    def __add_client_in_system(self, client_id: str):
+        """Adiciona um cliente ao sistema. Esse é inicializado com os seus valores iniciais.
+
+        Parameters
+        ----------
+        client_id : str
+            O id do cliente entrante no sistema."""
         self.__clients_in_system[client_id] = {
-            'client_color': client_color,
+            'events': [],
             str(MetricType.W1): 0,
             str(MetricType.X1): 0,
             str(MetricType.W2): 0,
             str(MetricType.X2): 0,
         }
 
+    def __get_last_event(self, client_id: int, event_type: EventType):
+        """Obtém o ultimo do tipo espeficificado para um cliente.
+
+        Parameters
+        ----------
+        client_id : str
+            O id do cliente entrante no sistema.
+        
+        event_type: EventType
+            O tipo do evento.
+
+        Returns
+        ----------
+        event: Event | None
+            O evento mais recente do cliente.
+        """
+        events = [
+            x for x in self.__clients_in_system[client_id]['events']
+            if x.type == event_type
+        ]
+
+        if (len(events) > 0):
+            return events[0]
+
+        return None
+
+    def __add_client_event(self, client_id: str, event: Event):
+        """Adiciona um evento na lista de eventos de um cliente específico.
+        Esses eventos serão utilizados para o cálculo das métricas desse cliente.
+
+        Parameters
+        ----------
+        client_id : str
+            O id do cliente.
+        event: Event
+            O evento associado.
+        """
+        self.__clients_in_system[client_id]['events'].append(event)
+
     def __remove_client_from_system(self, client_id: str):
+        """Remove um cliente do sistema.
+
+        Parameters
+        ----------
+        client_id : str
+            O id do cliente."""
         self.__clients_in_system.pop(client_id)
 
     def __get_next_client_in_waiting_q(self, queue_number: int) -> int:
@@ -738,19 +735,6 @@ class Simulator:
 
         return self.__current_service
 
-    def __get_client_color(self, client_id: int):
-        return self.__clients_in_system[client_id]['client_color']
-
-    def __get_last_event(self, client_id: int, event_type: EventType):
-        events = list(
-            filter(lambda x: x.client_id == client_id and x.type == event_type,
-                   self.__events_current_round))
-
-        if (len(events) > 0):
-            return events[-1]
-
-        return None
-
     def __set_current_service(self, client_id: int,
                               source_event_type: EventType):
         """Salva as informações do serviço corrente.
@@ -767,29 +751,30 @@ class Simulator:
     def __schedule_next_arrival(self):
         """Agenda a próxima chegada de um cliente ao sistema.\n
         O tempo de chegada do próximo cliente é determinado pela função self.__get_arrival_time."""
-
-        if (self.__collected_samples_simulation <= self.__samples_per_round * self.__number_of_rounds):
-            next_arrival_time = self.__current_timestamp + self.__get_arrival_time(
-            )
-
-            self.__enqueue_event(
-                Event(timestamp=next_arrival_time,
-                      type=EventType.ARRIVAL,
-                      queue_number=1,
-                      client_color=self.__current_round_color))
-
-    def __advance_round(self, generate_metrics=True):
-        print(
-            f'completed round {self.__current_round} / {self.__number_of_rounds}'
+        next_arrival_time = self.__current_timestamp + self.__get_arrival_time(
         )
 
-        if (generate_metrics):
-            self.__generate_round_metrics()
+        self.__enqueue_event(
+            Event(timestamp=next_arrival_time,
+                  type=EventType.ARRIVAL,
+                  queue_number=1))
+
+    def __advance_round(self, ):
+        """Avança a rodada atual e gera as métricas da rodada. 
+        Caso tenham sido executadas todas as rodadas, a simulação é encerrada."""
+        if (self.__current_round == self.__number_of_rounds):
+            self.__simulation_running = False
+            return
+
+        self.__debug_print(
+            f'completed round {self.__current_round+1} / {self.__number_of_rounds}'
+        )
+
+        self.__generate_round_metrics()
 
         self.__reset_round_control_variables()
 
         self.__current_round += 1
-        self.__current_round_color = self.__generate_color()
 
     def __handle_arrival(self, event: Event):
         """Trata o evento do tipo EventType.ARRIVAL.\n
@@ -797,6 +782,8 @@ class Simulator:
         Se o serviço corrente é oriundo da fila de espera 1, o cliente é inserido na fila de espera 1.\n
         Caso o serviço corrente seja oriundo da fila de espera 2, o serviço desse cliente é interrompido(EventType.HALT_SERVICE_2), 
         e o cliente recém chegado inicia o serviço imediatamente."""
+        self.__add_client_in_system(event.client_id)
+        self.__add_client_event(event.client_id, event)
         current_client_id, current_source_event_type = self.__get_current_service(
         )
 
@@ -830,44 +817,18 @@ class Simulator:
 
                 self.__enqueue_event(halt_service, True)
 
-        self.__add_client_in_system(event.client_id, event.client_color)
-
         self.__number_of_arrivals = self.__number_of_arrivals + 1
-
-        if (self.__number_of_arrivals == self.__arrivals_until_steady_state):
-            self.__advance_round(generate_metrics=False)
-        # elif (self.__number_of_arrivals > self.__arrivals_until_steady_state
-        #       and self.__current_round_color == event.client_color):
-        #     self.__collected_samples_current_round = self.__collected_samples_current_round + 1
-        #     self.__collected_samples_simulation = self.__collected_samples_simulation + 1
-
-        #     if (self.__collected_samples_current_round >=
-        #             self.__samples_per_round):
-        #         self.__advance_round()
 
         self.__schedule_next_arrival()
 
-        value = self.__get_waiting_q_size(event.queue_number)
-
-        self.__metric_estimators_current_round[str(
-            MetricType.NQ1)].add_sample(value)
-
-        if (current_source_event_type != None
-                and current_source_event_type == EventType.START_SERVICE_1):
-            self.__metric_estimators_current_round[str(
-                MetricType.N1)].add_sample(value + 1)
-        else:
-            self.__metric_estimators_current_round[str(
-                MetricType.N1)].add_sample(value)
-
-        # self.__generate_metric_samples(
-        #     client_id=None, metric_type_list=[MetricType.NQ1, MetricType.N1])
+        #gera métricas
+        self.__generate_q_size_metrics()
 
     def __handle_start_service_1(self, event: Event):
         """Trata o evento do tipo EventType.START_SERVICE_1.\n
         O cliente é removido da fila de espera 1.\n
         É obtido o tempo do serviço, e agendada o evento de término do serviço(EventType.END_SERVICE_1)."""
-
+        self.__add_client_event(event.client_id, event)
         next_client, _ = self.__dequeue_from_waiting_q(event.queue_number)
 
         self.__set_current_service(next_client, event.type)
@@ -887,14 +848,14 @@ class Simulator:
             MetricType.W1)] += (self.__current_timestamp -
                                 client_arrival.timestamp)
 
-        # self.__generate_metric_samples(client_id=event.client_id,
-        #                                metric_type_list=[MetricType.W1])
+        #gera métricas
+        self.__generate_q_size_metrics()
 
     def __handle_end_service_1(self, event: Event):
         """Trata o evento do tipo EventType.END_SERVICE_1.\n
         Caso as filas de esperas 1 e 2 estejam vazias, o cliente inicia o seu segundo serviço imediatamente(EventType.START_SERVICE_2).\n
         Caso haja clientes em alguma fila de espera, o cliente é enfileirado na fila de espera 2, e o serviço da fila mais prioritária é iniciado."""
-
+        self.__add_client_event(event.client_id, event)
         next_event = Event(timestamp=self.__current_timestamp,
                            type=EventType.START_SERVICE_2,
                            queue_number=2,
@@ -933,32 +894,14 @@ class Simulator:
             MetricType.X1)] += (self.__current_timestamp -
                                 client_start_service_1.timestamp)
 
-        value = self.__get_waiting_q_size(event.queue_number)
-
-        self.__metric_estimators_current_round[str(
-            MetricType.NQ2)].add_sample(value)
-
-        _, current_source_event_type = self.__get_current_service()
-
-        if (current_source_event_type != None
-                and current_source_event_type == EventType.START_SERVICE_2):
-            self.__metric_estimators_current_round[str(
-                MetricType.N2)].add_sample(value + 1)
-        else:
-            self.__metric_estimators_current_round[str(
-                MetricType.N2)].add_sample(value)
-
-        # self.__generate_metric_samples(client_id=event.client_id,
-        #                                metric_type_list=[
-        #                                    MetricType.NQ2, MetricType.N2,
-        #                                    MetricType.X1,
-        #                                ])
+        #gera métricas
+        self.__generate_q_size_metrics()
 
     def __handle_start_service_2(self, event: Event):
         """Trata o evento do tipo EventType.START_SERVICE_2.\n
         O cliente é removido da fila de espera 2.\n
         É obtido o tempo do serviço, e agendada o evento de saída do sistema(EventType.DEPARTURE)."""
-
+        self.__add_client_event(event.client_id, event)
         next_client, remaining_service_time = self.__dequeue_from_waiting_q(
             event.queue_number)
 
@@ -994,13 +937,13 @@ class Simulator:
                 MetricType.W2)] += (self.__current_timestamp -
                                     client_end_service_1.timestamp)
 
-        # self.__generate_metric_samples(client_id=event.client_id,
-        #                                metric_type_list=[MetricType.W2])
+        #gera métricas
+        self.__generate_q_size_metrics()
 
     def __handle_halt_service_2(self, event: Event):
         """Trata o evento do tipo EventType.HALT_SERVICE_2.\n
         O evento de saída do sistema do cliente atual é removido da fila de eventos, e o cliente é enfileirado na primeira posição da fila 2."""
-
+        self.__add_client_event(event.client_id, event)
         client_id, _ = self.__get_current_service()
 
         remaining_service_time = \
@@ -1017,6 +960,8 @@ class Simulator:
             in_the_front=True,
             remaining_service_time=remaining_service_time)
 
+        self.__set_current_service(None, None)
+
         # gera métricas
         client_start_service_2 = self.__get_last_event(
             event.client_id, EventType.START_SERVICE_2)
@@ -1025,14 +970,13 @@ class Simulator:
             MetricType.X2)] += (self.__current_timestamp -
                                 client_start_service_2.timestamp)
 
-        # self.__generate_metric_samples(client_id=event.client_id,
-        #                                metric_type_list=[MetricType.X2])
-
-        self.__set_current_service(None, None)
+        #gera métricas
+        self.__generate_q_size_metrics()
 
     def __handle_departure(self, event: Event):
         """Trata o evento do tipo EventType.DEPARTURE.\n
         O cliente é removido do serviço corrente, e o cliente da primeira posição da fila mais prioritária tem o serviço iniciado."""
+        self.__add_client_event(event.client_id, event)
         if (self.__get_waiting_q_size(1) > 0):
             next_client_id, _ = self.__get_next_client_in_waiting_q(1)
 
@@ -1054,6 +998,8 @@ class Simulator:
 
         self.__set_current_service(None, None)
 
+        self.__number_of_departures += 1
+
         # gera métricas do cliente atual
         client_start_service_2 = self.__get_last_event(
             event.client_id, EventType.START_SERVICE_2)
@@ -1062,24 +1008,54 @@ class Simulator:
             MetricType.X2)] += (self.__current_timestamp -
                                 client_start_service_2.timestamp)
 
-        self.__metric_estimators_current_round[str(
-                MetricType.W1)].add_sample(self.__clients_in_system[event.client_id][str(MetricType.W1)])
-        self.__metric_estimators_current_round[str(
-            MetricType.X1)].add_sample(self.__clients_in_system[event.client_id][str(MetricType.X1)])
-        self.__metric_estimators_current_round[str(
-            MetricType.T1)].add_sample(self.__clients_in_system[event.client_id][str(MetricType.X1)] + self.__clients_in_system[event.client_id][str(MetricType.W1)])
-        self.__metric_estimators_current_round[str(
-            MetricType.W2)].add_sample(self.__clients_in_system[event.client_id][str(MetricType.W2)])
-        self.__metric_estimators_current_round[str(
-            MetricType.X2)].add_sample(self.__clients_in_system[event.client_id][str(MetricType.X2)])
-        self.__metric_estimators_current_round[str(
-            MetricType.T2)].add_sample(self.__clients_in_system[event.client_id][str(MetricType.X2)] + self.__clients_in_system[event.client_id][str(MetricType.W2)])
-        
-        self.__collected_samples_current_round = self.__collected_samples_current_round + 1
-        self.__collected_samples_simulation = self.__collected_samples_simulation + 1
+        if (self.__number_of_departures == self.__services_until_steady_state +
+                1):
+            self.__debug_print('reached steady state')
+            self.__steady_state = True
 
-        if (self.__collected_samples_current_round == self.__samples_per_round):
-            self.__advance_round()
+        if (self.__steady_state):
+            # coleta métricas do cliente atual
+            self.__metric_estimators_current_round[str(
+                MetricType.W1)].add_sample(
+                    self.__clients_in_system[event.client_id][str(
+                        MetricType.W1)])
+
+            self.__metric_estimators_current_round[str(
+                MetricType.X1)].add_sample(
+                    self.__clients_in_system[event.client_id][str(
+                        MetricType.X1)])
+
+            self.__metric_estimators_current_round[str(
+                MetricType.T1
+            )].add_sample(
+                self.__clients_in_system[event.client_id][str(MetricType.X1)] +
+                self.__clients_in_system[event.client_id][str(MetricType.W1)])
+
+            self.__metric_estimators_current_round[str(
+                MetricType.W2)].add_sample(
+                    self.__clients_in_system[event.client_id][str(
+                        MetricType.W2)])
+
+            self.__metric_estimators_current_round[str(
+                MetricType.X2)].add_sample(
+                    self.__clients_in_system[event.client_id][str(
+                        MetricType.X2)])
+
+            self.__metric_estimators_current_round[str(
+                MetricType.T2
+            )].add_sample(
+                self.__clients_in_system[event.client_id][str(MetricType.X2)] +
+                self.__clients_in_system[event.client_id][str(MetricType.W2)])
+
+            self.__collected_samples_current_round = self.__collected_samples_current_round + 1
+            self.__collected_samples_simulation = self.__collected_samples_simulation + 1
+
+            #gera métricas do tamanho da fila
+            self.__generate_q_size_metrics()
+
+            if (self.__collected_samples_current_round >=
+                    self.__samples_per_round):
+                self.__advance_round()
 
         self.__remove_client_from_system(event.client_id)
 
@@ -1092,6 +1068,7 @@ class Simulator:
         finished_success = False
         start_time = datetime.utcnow().timestamp()
         try:
+            self.__simulation_running = True
             #enfileirando a primeira chegada na fila mais prioritária
             self.__enqueue_event(
                 Event(timestamp=self.__current_timestamp +
@@ -1099,12 +1076,13 @@ class Simulator:
                       type=EventType.ARRIVAL,
                       queue_number=1))
 
-            while (len(self.__event_q) > 0):
+            #while (len(self.__event_q) > 0):
+            while (self.__simulation_running):
                 event: Event = self.__dequeue_event()
 
                 self.__current_timestamp = event.timestamp
 
-                #print(event)
+                #self.__debug_print(event)
 
                 if (event.type == EventType.ARRIVAL):
                     self.__handle_arrival(event)
@@ -1127,13 +1105,12 @@ class Simulator:
                 end_time = datetime.utcnow().timestamp()
                 simulation_time = end_time - start_time
 
-                print(f'Total simulation time: {simulation_time} s')
+                self.__debug_print(
+                    f'Total simulation time: {simulation_time} s')
 
-                print(
+                self.__debug_print(
                     f'Results after {self.__number_of_rounds} rounds of simulation'
                 )
-
-                print()
 
                 os.mkdir(self.__results_folder)
 

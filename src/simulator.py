@@ -1,4 +1,5 @@
 import bisect
+import math
 import random
 import os
 import csv
@@ -10,7 +11,6 @@ import matplotlib.pyplot as plt
 
 from models.event import Event
 from models.event_type import EventType
-from models.metric import Metric
 from models.metric_type import MetricType
 from utils.estimator import Estimator
 
@@ -113,7 +113,8 @@ class Simulator:
 
         if (seed != None):
             #setando seed para a simulação
-            np.random.seed(seed=self.__seed)
+            #np.random.seed(seed=self.__seed)
+            random.seed(self.__seed)
 
         self.__number_of_qs: int = 2
         """Número de filas do sistema"""
@@ -479,7 +480,9 @@ class Simulator:
             Uma amostra de uma variável exponencial, representando um tempo de chegada."""
 
         if (self.__arrival_rule == 'exponential'):
-            return np.random.exponential(scale=1.0 / self.__arrival_rate)
+            u = random.random()
+            return math.log(u) / (-self.__arrival_rate)
+            #return np.random.exponential(scale=1.0 / self.__arrival_rate)
         elif (self.__arrival_rule == 'deterministic'):
             return self.__arrival_rate
 
@@ -492,7 +495,9 @@ class Simulator:
             Uma amostra de uma variável exponencial, representando um tempo de serviço."""
 
         if (self.__service_rule == 'exponential'):
-            return np.random.exponential(scale=1.0 / self.__service_rate)
+            u = random.random()
+            return math.log(u) / (-self.__service_rate)
+            #return np.random.exponential(scale=1.0 / self.__service_rate)
         elif (self.__service_rule == 'deterministic'):
             return self.__service_rate
 
@@ -1107,10 +1112,6 @@ class Simulator:
 
                 self.__debug_print(
                     f'Total simulation time: {simulation_time} s')
-
-                self.__debug_print(
-                    f'Results after {self.__number_of_rounds} rounds of simulation'
-                )
 
                 os.mkdir(self.__results_folder)
 

@@ -35,14 +35,20 @@ class Simulator:
         arrival_process : str
             O processo de chegada de clientes ao sistema. Valores: 'exponential', 'deterministic'.
         
+        inter_arrival_time: float
+            O tempo entre chegadas ao sistema. Só é considerado quando o arrival_process = 'deterministic'.
+
         utilization_pct: float
-            A porcentagem de utilização do sistema(rho).
+            A porcentagem de utilização do sistema(rho). Só é considerado quando o arrival_process = 'exponential'.
         
         service_process: str
             O processo de serviço do sistema. Valores: 'exponential', 'deterministic'.
+
+        service_time: float
+            O tempo de serviço do sistema. Só é considerado quando o service_process = 'deterministic'.
         
         service_rate: float
-            A taxa de serviço do sistema(mu).
+            A taxa de serviço do sistema(mu). Só é considerado quando o service_process = 'exponential'.
         
         number_of_rounds: int
             O número de rodadas da simulação.

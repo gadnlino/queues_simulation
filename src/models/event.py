@@ -3,6 +3,14 @@ from itertools import count
 
 from models.event_type import EventType
 
+EVENT_PRIORITY = {
+    EventType.ARRIVAL: 1,
+    EventType.START_SERVICE_1: 1,
+    EventType.END_SERVICE_1: 1,
+    EventType.START_SERVICE_2: 1,
+    EventType.HALT_SERVICE_2: 1,
+    EventType.DEPARTURE: 0
+}
 
 @dataclass
 class Event:
@@ -38,10 +46,16 @@ class Event:
             self.remaining_service_time = None
 
     def __lt__(self, other):
-        return self.timestamp < other.timestamp
+        if(EVENT_PRIORITY[self.type] == EVENT_PRIORITY[other.type]):
+            return self.timestamp < other.timestamp
+        
+        return EVENT_PRIORITY[self.type] < EVENT_PRIORITY[other.type]
 
     def __le__(self, other):
-        return self.timestamp <= other.timestamp
+        if(EVENT_PRIORITY[self.type] == EVENT_PRIORITY[other.type]):
+            return self.timestamp <= other.timestamp
+        
+        return EVENT_PRIORITY[self.type] < EVENT_PRIORITY[other.type]
 
     def as_dict(self):
         return {

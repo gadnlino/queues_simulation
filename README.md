@@ -10,9 +10,9 @@ O ponto inicial é o arquivo `main.py`, onde é criado uma instância do o simul
 
 A execução do simulador é da seguinte forma:
 
-No loop principal, é gerado o evento inicial de chegada do cliente(evento ARRIVAL). Em seguida o programa trata os eventos da lista de eventos e realiza a coleta das estatísticas apropriadas para o cliente associado ao evento. O objetivo é que, a cada partida de um cliente, tenham sido coletadas uma amostra de uma das métricas de seu tempo de atraso e tempo de serviço em cada uma das filas.
+No loop principal, é gerado o evento inicial de chegada do cliente(evento ARRIVAL). Em seguida o programa trata os eventos da lista de eventos e realiza a coleta das estatísticas apropriadas para o cliente associado a cada evento. O objetivo é que, a cada partida de um cliente, tenham sido coletadas uma amostra de uma das métricas de seu tempo de atraso e tempo de serviço em cada uma das filas. O simulador gera novas chegadas de cliente até que a quantidade de métricas a serem coletadas na simulação tenha sido atiginda.
 
-Ao final da simulação, há a opção de gerar arquivos com as métricas a cada rodada e gráficos com a evolução desses valores.
+Ao final da simulação, há a opção de gerar arquivos com as métricas a cada rodada e gráficos com a evolução desses valores. Os arquivos são salvos na pasta de resultados da simulação('results_{timestamp}').
 
 Os eventos da simulação podem ser dos seguintes tipos:
 
@@ -31,6 +31,47 @@ Os eventos da simulação podem ser dos seguintes tipos:
 Ao final de cada rodada, a média e a variância amostral são obtidas a partir das amostras obtidas durante o tratamento dos eventos.
 
 ### Simulador
+
+O simulador é inicializado com os seguintes parâmetros:
+
+- `arrival_process`:
+    O processo de chegada de clientes ao sistema. Valores: 'exponential', 'deterministic'.
+
+- `inter_arrival_time`:
+    O tempo entre chegadas ao sistema. Só é considerado quando o arrival_process = 'deterministic'.
+
+- `utilization_pct`:
+    A porcentagem de utilização do sistema(rho). Só é considerado quando o arrival_process = 'exponential'.
+
+- `service_process`:
+    O processo de serviço do sistema. Valores: 'exponential', 'deterministic'.
+
+- `service_time`:
+    O tempo de serviço do sistema. Só é considerado quando o service_process = 'deterministic'.
+
+- `service_rate`:
+    A taxa de serviço do sistema(mu). Só é considerado quando o service_process = 'exponential'.
+
+- `number_of_rounds`:
+    O número de rodadas da simulação.
+
+- `samples_per_round`:
+    O número de amostras que serão coletadas a cada rodada de simulação.
+
+- `services_until_steady_state`:
+    O número de serviços executados no sistema(ciclo completo de um cliente no sistema) até atingir o estado de equilíbrio no sistema.
+
+- `seed`:
+    A semente inicial para geração de variáveis aleatórias no sistema. Será usada durante toda a simulação.
+
+- `save_metric_per_round_file`:
+    Caso True, salva um arquivo .csv com a evolução das métricas por rodada.
+
+- `save_raw_event_log_file`:
+    Caso True, salva um arquivo .csv com todos os eventos da simulação(para depuração).
+
+- `plot_metrics_per_round`:
+    Caso True, gera gráficos com o tempo de espera médio e o número médio de clientes em cada fila.
 
 ### Estruturas e variáveis internas
 
@@ -58,6 +99,19 @@ Cada evento é representado pela classe `Event`, com as seguintes propriedades:
 - `queue_number`: Número da fila onde o evento irá ocorrer.
 - `remaining_service_time`: Tempo restante de serviço do cliente associado ao evento. Será preenchido somente quando type = EventType.START_SERVICE_2.
 
+Os tipos de evento tem a seguinte prioridade associadas entre si:
+
+`{
+    EventType.ARRIVAL: 1,
+    EventType.START_SERVICE_1: 1,
+    EventType.END_SERVICE_1: 1,
+    EventType.START_SERVICE_2: 1,
+    EventType.HALT_SERVICE_2: 1,
+    EventType.DEPARTURE: 0
+}`
+
+Isso faz com que, caso haja uma partida e uma chegada para o mesmo instante, ocorra primeiro o tratamento da partida.
+
 ### Geração de VA's
 
 A geração de variáveis aleatórias é feita usando a função [random](https://docs.python.org/3/library/random.html#random.random), disponível na biblioteca padrão da linguagem. A seed utilizado é a informada na configuração dos parametros do simulador.
@@ -68,33 +122,39 @@ $$x_0 = {\log{u_0} \over -\lambda}$$
 
 ### Amostragem
 
-Para as métricas referentes ao número de clientes no sistema e em cada fila de espera, a coleta é realizada a cada tratamento de evento da simulação. Isso permitiu uma maior precisão para a estimativa, em especial para a fila 2, que tem seus eventos associados tratados somente após os eventos da fila 1.
+Para as métricas referentes ao número de clientes no sistema e em cada fila de espera, a coleta é realizada a cada tratamento de evento da simulação. Isso permitiu uma maior precisão para as estimativas relacionados à fila 2, que tem seus eventos associados tratados somente após os eventos da fila 1 por conta da precedência de prioridade.
 
 Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é calculado o valor absoluto para cada um dos clientes, e, ao final da rodada, ou seja, após a partida de k clientes, calcula-se o valor médio e a variância para a rodada. Nesse momento, é incrementa-se o estimador para a média do valor médio das rodadas. No gráfico gerado ao final das rodadas, esse valor é apresentado por uma linha tracejada, por ex:
 
 [Médias da simulação tracejado em azul e vermelho](./images/example_mean_values.png)
 
+### Intervalo de confiança
+
 ## Teste de correção dos resultados
 
-Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Pela forma como foi configurada da rede de filas do problema e a prioridade preemptiva, para a fila convergir com os tempos determinísticos é necessário que o cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema.
+Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Pela forma como foi configurada da rede de filas do problema e a prioridade preemptiva, para a fila convergir com os tempos determinísticos é necessário que o cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema. Caso contrário, o simulador permanece em execução eternamente. Isso foi atestado ao rodar com os parâmetros abaixo:
 
-//TODO: corrigir implementação determinística
+| inter_arrival_time(s) 	| service_time(s) 	| number_of_rounds 	| samples_per_round 	| services_until_steady_state 	| E[W1] 	| E[W2] 	| termina execução? 	|
+|-----------------------	|-----------------	|------------------	|-------------------	|-----------------------------	|-------	|-------	|-------------------	|
+| 1.0                   	| 2.1             	| 20               	| 50                	| 10000                       	| -     	| -     	| não               	|
+| 2.1                   	| 1.0             	| 20               	| 50                	| 10000                       	| 0     	| 0     	| sim               	|
+| 2.0                   	| 1.0             	| 20               	| 50                	| 10000                       	| 0     	| 0     	| sim               	|
 
 ## Determinando a fase transiente
 
 Conforme o enunciado da tarefa, a equação de equilibrio para esse sistema é $$2\lambda = {\mu}$$
 
-Então, para $$\rho = 1$$, posso deduzir analiticamente que o sistema permanece em equilíbrio para taxas de chegada até 0.5. Esse valor será mencionado mais adiante na seção **Conclusão**.
+Então, para $$\rho = 1.0$$ e $$\mu = 1.0$$, posso deduzir analiticamente que o sistema permanece em equilíbrio para taxas de chegada até no máximo 0.5. Esse valor será mencionado mais adiante na seção **Conclusão**.
 
 Dado isso, analisei o número de serviços executados pelo sistema até que entrasse em equilibrio, para diferentes taxas até essa taxa de serviço crítica, incrementando o número de rodadas e o número de serviços por rodada, e configurando o número de serviços até a fase transiente para 0 nas configurações do simulador.
 
-De maneira geral, observou-se que com 10000 serviços executados(`number_of_rounds`=200, `samples_per_round`=50, `services_until_steady_state`=0), o sistema já se encontrava em equilibrio para as taxas de utilização menores do que 0.5:
+De maneira geral, observou-se que com 10000 serviços executados(realizando a execução com os parametros `number_of_rounds`=200, `samples_per_round`=50, `services_until_steady_state`=0), o sistema já se encontrava em equilibrio para as taxas de utilização menores do que 0.5:
 
 [rho = 0.2](./images/wait_time_10000_services_lambda_02.png)
 
 [rho = 0.4](./images/wait_time_10000_services_lambda_04.png)
 
-Com relação ao número ótimo de amostras por rodada, após algumas simulações com diferentes valores, foi observado que com k = 50 amostras por rodada fornecia um resultado razoável em relação à variancia e oferecendo um tempo de simulação mais rápido do que com quantidades maiores. Abaixo estão alguns resultados com diferentes valores de k(observar as colunas terminadas por '_cov_var').
+Com relação ao número ótimo de amostras por rodada, após algumas simulações com diferentes valores, foi observado que com k = 50 amostras por rodada fornecia um resultado razoável em relação à variancia e oferecendo um tempo de simulação mais rápido do que com quantidades maiores. Não foi observado diferença considerável na co-variância para valores de k acima deste. Abaixo estão alguns resultados com diferentes valores de k(observar as colunas terminadas por '_cov_var', em especial 'N2_cov_var' e 'NQ2_cov_var', que apresentam os maiores valores).
 
 [k = 50](./files/metric_per_round_k_50.csv)
 

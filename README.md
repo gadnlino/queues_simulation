@@ -1,6 +1,6 @@
 # Trabalho de simulação - Teoria de Filas
 #### Guilherme Avelino do Nascimento - DRE 117078497
-### Link para o repositório no GitHub: https://github.com/gadnlino/queues_simulation
+#### Link para o repositório no GitHub: https://github.com/gadnlino/queues_simulation
 
 ## Introdução
 

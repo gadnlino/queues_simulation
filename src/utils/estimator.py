@@ -37,8 +37,8 @@ class Estimator:
     def variance_ci(self, confidence : float):
         alpha = 1-confidence
 
-        low_ppf = stats.chi2.ppf(alpha / 2, self.__n-1)
-        high_ppf = stats.chi2.ppf(1 - alpha / 2, self.__n-1)
+        low_ppf = stats.chi2.ppf(alpha / 2, self.__n - 1)
+        high_ppf = stats.chi2.ppf(1 - alpha / 2, self.__n - 1)
 
         upper = (self.__n - 1) * self.variance() / low_ppf
         lower = (self.__n - 1) * self.variance() / high_ppf
@@ -62,13 +62,4 @@ class Estimator:
         lower_limit = mean - a
 
         return (lower_limit, upper_limit, precision)
-
-        # lower, upper = stats.t.interval(alpha=confidence,
-        #       df=self.__n-1,
-        #       loc=mean, 
-        #       scale=std)
-            
-        # precision = (upper - lower) / (upper + lower)
-
-        # return upper, lower, precision
         

@@ -53,6 +53,12 @@ class Simulator:
         number_of_rounds: int
             O número de rodadas da simulação.
         
+        target_precision: float
+            A precisão alvo para as métricas coletadas na simulação.
+        
+        confidence: float
+            A porcentagem do intervalo de confiança determinado nas métricas coletadas no sistema.
+        
         samples_per_round: int
             O número de amostras que serão coletadas a cada rodada de simulação.
         
@@ -85,7 +91,6 @@ class Simulator:
                  services_until_steady_state: int = 0,
                  seed: int = None,
                  confidence: float = 0.95,
-                 confidence_interval_distribution: str = 't',
                  target_precision: float = 0.05,
                  save_metric_per_round_file: bool = True,
                  save_raw_event_log_file: bool = False,
@@ -105,6 +110,7 @@ class Simulator:
             """Taxa de serviço(mu)."""
         else:
             self.__service_time = service_time
+            """O tempo de cada serviço executado no sistema. Só é válido quando service_process = 'deterministic'."""
         
         self.__arrival_process = arrival_process
         """Processos de chegada de chegada(determinística ou exponencial)."""
@@ -808,12 +814,12 @@ class Simulator:
     def __advance_round(self, ):
         """Avança a rodada atual e gera as métricas da rodada. 
         Caso tenham sido executadas todas as rodadas, a simulação é encerrada."""
-        # if (self.__current_round == self.__number_of_rounds):
-        #     self.__simulation_running = False
-        #     return
+        if (self.__target_precision == None and self.__current_round == self.__number_of_rounds):
+            self.__simulation_running = False
+            return
 
         self.__debug_print(
-            f'completed round {self.__current_round+1}'
+            f'completed round {self.__current_round + 1}'
         )
 
         self.__generate_round_metrics()

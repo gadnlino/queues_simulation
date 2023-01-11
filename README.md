@@ -1,4 +1,6 @@
 # Trabalho de simulação - Teoria de Filas
+#### Guilherme Avelino do Nascimento - DRE 117078497
+### Link para o repositório no GitHub: https://github.com/gadnlino/queues_simulation
 
 ## Introdução
 
@@ -6,13 +8,13 @@
 
 A implementação foi realizada em Python 3. Para a execução do simulador, ver seção **Instruções para execução do simulador**.
 
-O ponto inicial é o arquivo `main.py`, onde é criado uma instância do o simulador(classe Simulator), com os parametros apropriados. No construtor da classe, são iniciadas as variáveis de controle e parametrizações do simulador(detalhados mais adiante). Em seguida, inicia-se a execução do simulador, chamando o método `run()`.
+O ponto inicial é o arquivo `main.py`, onde é criado uma instância do o simulador(classe Simulator), com os parâmetros apropriados. No construtor da classe, são iniciadas as variáveis de controle e parametrizações do simulador(detalhados mais adiante). Em seguida, inicia-se a execução do simulador, chamando o método `run()`.
 
 A execução do simulador é da seguinte forma:
 
-No loop principal, é gerado o evento inicial de chegada do cliente(evento ARRIVAL). Em seguida o programa trata os eventos da lista de eventos e realiza a coleta das estatísticas apropriadas para o cliente associado a cada evento. O objetivo é que, a cada partida de um cliente, tenham sido coletadas uma amostra de uma das métricas de seu tempo de atraso e tempo de serviço em cada uma das filas. O simulador gera novas chegadas de cliente até que a quantidade de métricas a serem coletadas na simulação tenha sido atiginda.
+No loop principal, é gerado o evento inicial de chegada do cliente(evento ARRIVAL). Em seguida o programa trata os eventos da lista de eventos e realiza a coleta de amostras das estatísticas  para o cliente associado a cada evento. O objetivo é que, a cada partida de um cliente, tenham sido coletadas uma amostra de uma das métricas de seu tempo de atraso e tempo de serviço em cada uma das filas. O simulador gera novas chegadas de cliente até que a quantidade de métricas a serem coletadas na simulação tenha sido atigida(seja atingindo a precisão alvo para as métricas, ou atingido o número de rodadas informado).
 
-Ao final da simulação, há a opção de gerar arquivos com as métricas a cada rodada e gráficos com a evolução desses valores. Os arquivos são salvos na pasta de resultados da simulação('results_{timestamp}').
+Ao final da simulação, há a opção de gerar arquivos com as métricas a cada rodada e gráficos com a evolução desses valores. Os arquivos são salvos na pasta de resultados da simulação('results_{timestamp}/').
 
 Os eventos da simulação podem ser dos seguintes tipos:
 
@@ -55,6 +57,12 @@ O simulador é inicializado com os seguintes parâmetros:
 - `number_of_rounds`:
     O número de rodadas da simulação.
 
+- `target_precision`:
+    A precisão alvo para as métricas coletadas na simulação.
+        
+- `confidence`:
+    A porcentagem do intervalo de confiança determinado nas métricas coletadas no sistema.
+
 - `samples_per_round`:
     O número de amostras que serão coletadas a cada rodada de simulação.
 
@@ -81,15 +89,15 @@ Ao longo do código, são utilizadas diversas variáveis e estruturas de control
 
 - `self.__waiting_qs`: representação das filas de espera do sistema(como uma lista de listas). É gerida utilizando a estratégia FIFO, suportada pelas APIs padrão de listas do Python.
 
-- `self.__utilization_pct`, `self.__service_rate`, `self.__arrival_rate`: São as indicações das taxas de utilização, de serviço e de chegada ao sistema. As duas primeiras são informadas no momento de instânciação da classe do simulador, e a última é derivada dessas, pela relação $$\rho = {\lambda \over \mu}$$
+- `self.__arrival_rate`: A taxa de chegada de clientes ao sistema. É obtida pela relação $$\rho = {\lambda \over \mu}$$
 
-- `self.__current_timestamp`, `self.__current_service`: usadas para armazenar o tempo corrente de simulação e o serviço corrente em execução. O tempo é avançado à medida em que os eventos são tratados. Quando há o início ou término de um serviço, o valor do serviço corrente é modificado.
+- `self.__current_timestamp`, `self.__current_service`: Armazenam o tempo corrente de simulação e o serviço corrente em execução. O tempo é avançado à medida em que os eventos são tratados. Quando há o início ou término de um serviço, o valor do serviço corrente é modificado.
 
-- `self.__number_of_rounds`, `self.__samples_per_round`, `self.__current_round`: O número de rodadas da simulação, o número de amostras coletadas a cada rodada, e o contador da rodada corrente.
+- `self.__current_round`: O número de rodadas da simulação, o número de amostras coletadas a cada rodada, e o contador da rodada corrente.
 
-- `self.__metrics_per_round`: Ao final de cada rodada, o método `self.__generate_round_metrics` é chamado e as métricas para a rodada atual são geradas. O resultado é armazenado como um registro na lista `self.__metrics_per_round`. Essa lista é usada para gerar os gráficos e os arquivos .csv ao final da simulação.
+- `self.__metric_estimators_current_round`, `self.__metrics_per_round`, `self.__metric_estimators_simulation`: No tratamento de cada tipo de evento, `self.__metric_estimators_current_round` é increntado com a métrica calculada para cada cliente. Ao final de cada rodada, o método `self.__generate_round_metrics` é chamado e as métricas para a rodada atual são geradas. O resultado é armazenado como um registro na lista `self.__metrics_per_round` e incrementado no estimador global das métricas da simulação, `self.__metric_estimators_simulation`. Essas estruturas são usadas gerar os gráficos e os arquivos .csv ao final da simulação.
 
-- `self.__event_log_raw`, `self.__event_log_raw_file`: Log de todos os eventos de todas as rodadas de simulação. Ao final, há a opção de salvar esse log no arquivo indicado pela varíavel `self.__event_log_raw_file`. Não interferem nas funções essenciais do simulador, mas foram utilizadas na depuração do simulador nas etapas iniciais de implementação.
+- `self.__clients_in_system`: Armazena todos os clientes presentes no sistema, seus eventos, e as métricas já calculadas para o cliente.
 
 Cada evento é representado pela classe `Event`, com as seguintes propriedades:
 
@@ -114,7 +122,7 @@ Isso faz com que, caso haja uma partida e uma chegada para o mesmo instante, oco
 
 ### Geração de VA's
 
-A geração de variáveis aleatórias é feita usando a função [random](https://docs.python.org/3/library/random.html#random.random), disponível na biblioteca padrão da linguagem. A seed utilizado é a informada na configuração dos parametros do simulador.
+A geração de variáveis aleatórias é feita usando a função [random](https://docs.python.org/3/library/random.html#random.random), disponível na biblioteca padrão do Python. A seed utilizada é a informada na configuração dos parâmetros do simulador.
 
 Para gerar amostras de variáveis aleatórias exponenciais, é usado o seguinte cálculo(como também indicado nos materiais de aula):
 
@@ -122,23 +130,27 @@ $$x_0 = {\log{u_0} \over -\lambda}$$
 
 ### Amostragem
 
-Para as métricas referentes ao número de clientes no sistema e em cada fila de espera, a coleta é realizada a cada tratamento de evento da simulação. Isso permitiu uma maior precisão para as estimativas relacionados à fila 2, que tem seus eventos associados tratados somente após os eventos da fila 1 por conta da precedência de prioridade.
+Para as métricas referentes ao número de clientes no sistema e em cada fila de espera, a coleta é realizada a cada tratamento de evento da simulação. Isso permitiu uma maior precisão para as estimativas relacionados à fila 2, que tem seus eventos associados tratados somente após os eventos da fila 1 devido à precedência de prioridade.
 
-Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é calculado o valor absoluto para cada um dos clientes, e, ao final da rodada, ou seja, após a partida de k clientes, calcula-se o valor médio e a variância para a rodada. Nesse momento, é incrementa-se o estimador para a média do valor médio das rodadas. No gráfico gerado ao final das rodadas, esse valor é apresentado por uma linha tracejada, por ex:
+Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é calculado o valor absoluto para cada um dos clientes, e, ao final da rodada, ou seja, após a partida de k clientes, calcula-se o valor médio e a variância para a rodada. Nesse momento, é incrementa-se o estimador global para a média e variância do valor médio das rodadas. No gráfico gerado ao final das rodadas, esse valor é representado por uma linha tracejada, por ex:
 
-[Médias da simulação tracejado em azul e vermelho](./images/example_mean_values.png)
-
-### Intervalo de confiança
+[Médias da simulação (linhas azuis e vermelhgas tracejadas)](./images/example_mean_values.png)
 
 ## Teste de correção dos resultados
 
-Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Pela forma como foi configurada da rede de filas do problema e a prioridade preemptiva, para a fila convergir com os tempos determinísticos é necessário que o cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema. Caso contrário, o simulador permanece em execução eternamente. Isso foi atestado ao rodar com os parâmetros abaixo:
+Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Em um cenário que há infinitas chegadas ao sistema, é necessário que cada cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema. Caso contrário, o simulador permanece em execução eternamente. Nesse cenário, os clientes teriam tempo de espera em fila nulo. Isso foi atestado ao rodar com os parâmetros abaixo:
 
 | inter_arrival_time(s) 	| service_time(s) 	| number_of_rounds 	| samples_per_round 	| services_until_steady_state 	| E[W1] 	| E[W2] 	| termina execução? 	|
 |-----------------------	|-----------------	|------------------	|-------------------	|-----------------------------	|-------	|-------	|-------------------	|
 | 1.0                   	| 2.1             	| 20               	| 50                	| 10000                       	| -     	| -     	| não               	|
 | 2.1                   	| 1.0             	| 20               	| 50                	| 10000                       	| 0     	| 0     	| sim               	|
 | 2.0                   	| 1.0             	| 20               	| 50                	| 10000                       	| 0     	| 0     	| sim               	|
+
+## Determinação do intervalo de confiança e número de rodadas
+
+Ao final de cada rodada, são determinados os intervalos de confiança para a média e variânciia de cada métrica, a partir do estimador global(`self.__metric_estimators_simulation`). O calculo é feito iterativamente, e a simulação e encerrada somente quando não há nenhuma métrica em que a precisão está acima do `target_precision` informado para a porcentagem de confiança `confidence`.
+
+Os cálculos usados para determinar os valores máximos e mínimos do intervalo de confiança estão no arquivo `src/utils/estimator.py`.
 
 ## Determinando a fase transiente
 
@@ -166,13 +178,6 @@ Com relação ao número ótimo de amostras por rodada, após algumas simulaçõ
 
 ## Análise dos resultados
 
-//TODO:
-### Chegando ao fator mínimo
-
-## Otimizações
-//TODO:
-## Conclusão
-
 Ao executar a simulação para os diferentes valores da taxa de utilização, fica claro a relação entre essa taxa e a convergência da fila para um estado de equilibrio; Ao executar com taxas maiores do que 0.5, o número de clientes na fila 2 e o tempo de espera médio aumentam indefinidamente!
 
 [Número médio de clientes na fila, lambda=0.49](./images/q_size_lambda_049.png)
@@ -183,18 +188,57 @@ Ao executar a simulação para os diferentes valores da taxa de utilização, fi
 
 [Atraso médio, lambda=0.51](./images/wait_time_lambda_051.png)
 
+## Chegando ao fator mínimo
+
+As configurações da máquina em que executei os testes:
+
+- Processador: Intel(R) Core(TM) i5-1035G1 CPU @ 1.00GHz   1.19 GHz
+
+- RAM: 20,0 GB
+
+- Sistema Operacional: Windows 10
+
+- Modelo: HP...
+
+Os valores abaixo mostram a quantidade de rodadas até que todas as métricas coletadas alcancem a precisão desejada:
+
+| teste | utilizacao | taxa de serviço | seed     | número de rodadas | coletas por rodada | partidas desprezadas | fator mínimo | tempo(segundos) |
+| ----- | ---------- | --------------- | -------- | ----------------- | ------------------ | -------------------- | ------------ | --------------- |
+| 1     | 0.2        | 1.0             | 0        | 3071              | 50                 | 10000                | 163550       | 137,18          |
+| 2     | 0.2        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 137,36          |
+| 3     | 0.2        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 136,47          |
+| 5     | 0.4        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 142,86          |
+| 6     | 0.4        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 159,34          |
+| 7     | 0.6        | 1.0             | 0        | 3071              | 50                 | 10000                | 163550       | 137,99          |
+| 8     | 0.6        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 145,02          |
+| 9     | 0.6        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 136,32          |
+| 10    | 0.8        | 1.0             | 0        | 3071              | 50                 | 10000                | 163550       | 140,22          |
+| 11    | 0.8        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 137,75          |
+| 12    | 0.8        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 156,90          |
+| 13    | 0.9        | 1.0             | 0        | 3598              | 50                 | 10000                | 189900       | 159,83          |
+| 14    | 0.9        | 1.0             | 1000     | 3166              | 50                 | 10000                | 168300       | 141,38          |
+| 15    | 0.9        | 1.0             | 10000000 | 3453              | 50                 | 10000                | 182650       | 154,99          |
+
+## Conclusões
+
 ### Dificuldades
 - Amostragem de métricas
 
-    Não pude utilizar um sistema de cores a cada **chegada**, como indicado nos materiais de aula. O motivo foi que, na minha implemenmtação, caso considerasse somente as chegadas, as métricas da segunda fila(W2 e X2) poderiam não ser calculadas para o número desejado de clientes. Com isso, determinei que a rodada avançaria sempre que k clientes tivessem a sua **partida** do sistema.
+    Não pude utilizar um sistema de cores a cada **chegada**, como indicado nos materiais de aula. Na minha implementação, caso considerasse somente as chegadas, as métricas da segunda fila(W2 e X2) poderiam não ser calculadas para o número desejado de clientes, pois os eventos da fila 2 são resolvidos por último. Isso criou cenários em que o programa do simulador ficou execução indefinidamente(o caso da fila D/D/1 mencionado anteriormente, por exemplo). Perante isso, determinei que a rodada avançaria sempre que k clientes tivessem a sua **partida** do sistema.
 
-- Cálculo do intervalo de confiança
+### Pendências
+- É possível melhorar a análise do simulador para cenários determinísticos, ao aceitar uma lista de instantes de chegada, por exemplo. Isso facilitaria a depuração do simulador ao gerar arquivos de logs menores com a lista dos eventos do sistema.
 
-    Como calculo o número de rodadas previamente, tendo uma precisão alvo para o intervalo de confiança?
+- É necessário uma análise detalhada do simulador comparativamente com os cenários obtidos analiticamente.
 
 ## Instruções para execução do simulador
 
-//TODO:
+Para a execução, é necessário instalar a versão [versão 3.11.1 do Python](https://www.python.org/downloads/release/python-3111/).
 
-## Integrantes do grupo
-- Guilherme Avelino do Nascimento - DRE 117078497
+Após a instalação, para realizar o download das dependências do projeto, executar o seguinte comando abaixo a partir da pasta raiz:
+
+`pip install -r requirements.txt`
+
+Para executar o simulador, executar o comando a seguir a partir da pasta raiz do projeto:
+
+`python src/main.py`

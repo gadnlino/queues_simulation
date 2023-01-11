@@ -84,6 +84,9 @@ class Simulator:
                  samples_per_round: int = 5,
                  services_until_steady_state: int = 0,
                  seed: int = None,
+                 confidence: float = 0.95,
+                 confidence_interval_distribution: str = 't',
+                 target_precision: float = 0.05,
                  save_metric_per_round_file: bool = True,
                  save_raw_event_log_file: bool = False,
                  plot_metrics_per_round: bool=False):
@@ -112,8 +115,14 @@ class Simulator:
         elif(self.__arrival_process == 'deterministic'):
             self.__inter_arrival_time = inter_arrival_time
 
+        self.__target_precision = target_precision
+        """A precisão alvo para as métricas coletadas na simulação."""
+
         self.__number_of_rounds: int = number_of_rounds
-        """Número de rodadas da simulação"""
+        """Número de rodadas da simulação. Só é considerada quando target_precision não for informada."""
+
+        self.__confidence = confidence
+        """A porcentagem do intervalo de confiança determinado nas métricas coletadas no sistema."""
 
         self.__samples_per_round: int = samples_per_round
         """Número de amostras por rodada"""
@@ -128,15 +137,15 @@ class Simulator:
             #setando seed para a simulação
             #np.random.seed(seed=self.__seed)
             random.seed(self.__seed)
-
+        
         self.__number_of_qs: int = 2
         """Número de filas do sistema"""
 
         self.__current_round: int = 0
-        """Rodada atual"""
+        """Rodada atual."""
 
         self.__current_timestamp = 0.0
-        """Tempo atual da simulação"""
+        """Tempo atual da simulação."""
 
         self.__current_service = None
         """Cliente atualmente em serviço"""
@@ -799,15 +808,34 @@ class Simulator:
     def __advance_round(self, ):
         """Avança a rodada atual e gera as métricas da rodada. 
         Caso tenham sido executadas todas as rodadas, a simulação é encerrada."""
-        if (self.__current_round == self.__number_of_rounds):
-            self.__simulation_running = False
-            return
+        # if (self.__current_round == self.__number_of_rounds):
+        #     self.__simulation_running = False
+        #     return
 
         self.__debug_print(
-            f'completed round {self.__current_round+1} / {self.__number_of_rounds}'
+            f'completed round {self.__current_round+1}'
         )
 
         self.__generate_round_metrics()
+
+        if(self.__current_round > 0):
+            precisions_above_target = []
+
+            for a in self.__metric_estimators_simulation:
+                if(a.endswith('_est_mean')):
+                    _, _, precision = self.__metric_estimators_simulation[a].mean_ci(confidence=self.__confidence)
+                    if(precision > self.__target_precision):
+                        precisions_above_target.append((a, precision))
+                elif(a.endswith('_est_var')):
+                    _, _, precision = self.__metric_estimators_simulation[a].variance_ci(confidence=self.__confidence)
+                    if(precision > self.__target_precision):
+                        precisions_above_target.append((a, precision))
+            
+            print(f'metrics with precision above target: {precisions_above_target}')
+
+            if(len(precisions_above_target) == 0):
+                self.__simulation_running = False
+                return
 
         self.__reset_round_control_variables()
 

@@ -198,8 +198,6 @@ As configurações da máquina em que executei os testes:
 
 - Sistema Operacional: Windows 10
 
-- Modelo: HP...
-
 Os valores abaixo mostram a quantidade de rodadas até que todas as métricas coletadas alcancem a precisão desejada:
 
 | teste | utilizacao | taxa de serviço | seed     | número de rodadas | coletas por rodada | partidas desprezadas | fator mínimo | tempo(segundos) |

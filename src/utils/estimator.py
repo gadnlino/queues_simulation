@@ -62,4 +62,11 @@ class Estimator:
         lower_limit = mean - a
 
         return (lower_limit, upper_limit, precision)
+
+    def __str__(self):
+        return str({
+            'n': self.__n,
+            'mean': self.mean(),
+            'variance': self.variance()
+        })
         

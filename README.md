@@ -4,6 +4,10 @@
 
 ## Introdução
 
+### Objetivo
+
+O objetivo deste relatório é analisar o cenário descrito para o trabalho, que é o mesmo que está na página 111 da apostila da disciplina, e realizar comparações entre os valores analíticos lá apresentados e os obtidos nas simulações detalhadas a seguir.
+
 ### Visão geral
 
 A implementação foi realizada em Python 3. Para a execução do simulador, ver seção **Instruções para execução do simulador**.
@@ -122,7 +126,7 @@ Isso faz com que, caso haja uma partida e uma chegada para o mesmo instante, oco
 
 ### Geração de VA's
 
-A geração de variáveis aleatórias é feita usando a função [random](https://docs.python.org/3/library/random.html#random.random), disponível na biblioteca padrão do Python. A seed utilizada é a informada na configuração dos parâmetros do simulador.
+A geração de variáveis aleatórias é feita usando a função [random](https://docs.python.org/3/library/random.html#random.random), disponível na biblioteca padrão do Python. A seed inicial utilizada é a informada na configuração dos parâmetros do simulador.
 
 Para gerar amostras de variáveis aleatórias exponenciais, é usado o seguinte cálculo(como também indicado nos materiais de aula):
 
@@ -136,7 +140,66 @@ Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é 
 
 [Médias da simulação (linhas azuis e vermelhas tracejadas)](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png))
 
+## Determinação do intervalo de confiança e número de rodadas
+
+Ao final de cada rodada, são determinados os intervalos de confiança para a média e variânciia de cada métrica, a partir do estimador global(`self.__metric_estimators_simulation`). O calculo é feito iterativamente, e a simulação e encerrada somente quando não há nenhuma métrica em que a precisão está acima do `target_precision` informado para a porcentagem de confiança `confidence`.
+
+Os cálculos usados para determinar os valores máximos e mínimos do intervalo de confiança estão no arquivo `src/utils/estimator.py`.
+
 ## Teste de correção dos resultados
+
+Conforme indicado na página 111 da apostila, o cenário pode ser caracterizado por um sistema de filas HOL em que a fila 1 tem prioridade e interrompe com continuidade os serviços a fila 2. Só há entradas exógenas na primeira fila, e ao final do primeiro serviço $$X_1$$, os clientes seguem para a segunda fila e recebem o serviço $$X_2$$, de modo que o serviço total é $$X = {X_1 + X_2}$$.
+
+Nesse cenário, é mais prático analisar as duas filas de maneira separada.
+
+### Fila 1
+
+A fila 1 não sofre interrupção, então:
+
+$$E[W_1] = {\rho_1 E[X_{1r}] \over {1-\rho_1}}$$
+
+Como os tempos de serviços seguem uma distribuição exponencial,
+
+$$E[X_{1r}] = E[X_1] = {1 \over \mu }$$
+
+Dessa forma:
+
+$$E[W_1] = {\rho_1 \over {({1-\rho_1}) \mu}}$$
+
+
+Os resultados analíticos, para as diferentes taxas de utilização(com $$\mu = 1$$):
+
+| $$\rho_1$$ 	| $$E[W_1]$$  	|
+|------------	|------------	|
+| 0,2        	| 0,25       	|
+| 0,4        	| 0,66666... 	|
+| 0,6        	| 1,5        	|
+| 0,8        	| 4          	|
+| 0,9        	| 9          	|
+
+Ao rodar a simulação, com processos de chegadas e serviços exponenciais(fila 1 se comportando como uma fila M/M/1):
+
+Com precisão de 5%:
+
+| metric      	| lower               	| mean                	| upper              	| variance            	| precision            	| confidence 	| rounds 	|
+|-------------	|---------------------	|---------------------	|--------------------	|---------------------	|----------------------	|------------	|--------	|
+| W1_est_mean 	| 0.24417837568491232 	| 0.24891135818876323 	| 0.2536443406926141 	| 0.02541166057338099 	| 0.019014730939926075 	| 0.95       	| 3071   	|
+
+Com 20000 rodadas:
+
+| metric      	| lower              	| mean                	| upper               	| variance             	| precision            	| confidence 	| rounds 	|
+|-------------	|--------------------	|---------------------	|---------------------	|----------------------	|----------------------	|------------	|--------	|
+| W1_est_mean 	| 0.2498590794078621 	| 0.25179153846424845 	| 0.25372399752063485 	| 0.027602972390038418 	| 0.007674837161617935 	| 0.95       	| 20001  	|
+
+Com 50000 rodadas:
+
+| metric      	| lower               	| mean               	| upper              	| variance             	| precision            	| confidence 	| rounds 	|
+|-------------	|---------------------	|--------------------	|--------------------	|----------------------	|----------------------	|------------	|--------	|
+| W1_est_mean 	| 0.24913344201438836 	| 0.2503461970724465 	| 0.2515589521305046 	| 0.027179758079981704 	| 0.004844311885860886 	| 0.95       	| 50001  	|
+
+Garantidamente pela Lei Forte dos Grandes Números, se o número de rodadas da simulação for infinitamente grande, o resultado convergirá para o valor calculado analiticamente.
+
+Para $$E[W_2]$$:
 
 Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Em um cenário que há infinitas chegadas ao sistema, é necessário que cada cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema. Caso contrário, o simulador permanece em execução eternamente. Nesse cenário, os clientes teriam tempo de espera em fila nulo. Isso foi atestado ao rodar com os parâmetros abaixo:
 
@@ -145,12 +208,6 @@ Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Em
 | 1.0                   	| 2.1             	| 20               	| 50                	| 10000                       	| não               	|
 | 2.1                   	| 1.0             	| 20               	| 50                	| 10000                       	| sim               	|
 | 2.0                   	| 1.0             	| 20               	| 50                	| 10000                       	| sim               	|
-
-## Determinação do intervalo de confiança e número de rodadas
-
-Ao final de cada rodada, são determinados os intervalos de confiança para a média e variânciia de cada métrica, a partir do estimador global(`self.__metric_estimators_simulation`). O calculo é feito iterativamente, e a simulação e encerrada somente quando não há nenhuma métrica em que a precisão está acima do `target_precision` informado para a porcentagem de confiança `confidence`.
-
-Os cálculos usados para determinar os valores máximos e mínimos do intervalo de confiança estão no arquivo `src/utils/estimator.py`.
 
 ## Determinando a fase transiente
 

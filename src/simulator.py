@@ -254,9 +254,6 @@ class Simulator:
         self.__results_folder = f'./results_{str(datetime.utcnow().timestamp()).replace(".", "")}'
         """Pasta onde os arquivos de resultado da simulação serão salvos"""
 
-        self.__event_log_raw_file: str = f'{self.__results_folder}/event_log_raw.csv'
-        """Arquivo onde o log de eventos da simulação serão salvos"""
-
     def __reset_round_control_variables(self):
         """Reseta variáveis de controle da rodada para seus valores iniciais."""
 
@@ -270,11 +267,14 @@ class Simulator:
     def __save_event_logs_raw_file(self):
         """Salva o log de eventos em um arquivo .csv."""
 
-        if (os.path.exists(self.__event_log_raw_file)):
-            os.remove(self.__event_log_raw_file)
+        event_log_raw_file: str = f'{self.__results_folder}/event_log_raw.csv'
+        """Arquivo onde o log de eventos da simulação serão salvos"""
+
+        if (os.path.exists(event_log_raw_file)):
+            os.remove(event_log_raw_file)
 
         if (len(self.__event_log_raw) > 0):
-            with open(self.__event_log_raw_file, 'a+',
+            with open(event_log_raw_file, 'a+',
                       newline='') as output_file:
 
                 fieldnames = [
@@ -287,10 +287,56 @@ class Simulator:
                 dict_writer.writeheader()
                 dict_writer.writerows(self.__event_log_raw)
 
-    def __save_metric_per_round_file(self):
+    def __save_simulation_metrics_file(self):
+        """Salva o log de eventos em um arquivo .csv."""
+
+        simulation_metrics_file: str = f'{self.__results_folder}/simulation_metrics.csv'
+        """Arquivo onde o log de eventos da simulação serão salvos"""
+
+        if (os.path.exists(simulation_metrics_file)):
+            os.remove(simulation_metrics_file)
+
+        with open(simulation_metrics_file, 'a+',
+                    newline='') as output_file:
+
+            #fieldnames = list(map(lambda x: str(x), self.__metric_estimators_simulation.keys()))
+
+            fieldnames = ['metric', 'lower', 'mean', 'upper', 'variance', 'precision', 'confidence', 'rounds']
+
+            rows = []
+
+            for metric in self.__metric_estimators_simulation:
+                lower = ''
+                upper = ''
+                precision = ''
+
+                if(metric.endswith('_est_mean')):
+                    lower, upper, precision = self.__metric_estimators_simulation[metric].mean_ci(confidence=self.__confidence)
+                elif(metric.endswith('_est_var')):
+                    lower, upper, precision = self.__metric_estimators_simulation[metric].variance_ci(confidence=self.__confidence)
+                
+                rows.append({
+                    'metric':metric,
+                    'lower':lower,
+                    'mean':self.__metric_estimators_simulation[metric].mean(),
+                    'upper': upper,
+                    'variance':self.__metric_estimators_simulation[metric].variance(),
+                    'precision': precision,
+                    'confidence': self.__confidence,
+                    'rounds': self.__current_round + 1
+                })                    
+
+            dict_writer = csv.DictWriter(output_file,
+                                            fieldnames=fieldnames)
+            dict_writer.writeheader()
+            dict_writer.writerows(rows)
+        
+            self.__debug_print(f'Final simulation results saved at {simulation_metrics_file}')
+
+    def __save_metric_per_round_evolution_file(self):
         """Salva as métricas de todas as rodadas em um arquivo .csv."""
 
-        file_name = f'{self.__results_folder}/metric_per_round_{datetime.utcnow().timestamp()}.csv'
+        file_name = f'{self.__results_folder}/metric_per_round_evolution_{datetime.utcnow().timestamp()}.csv'
 
         if (os.path.exists(file_name)):
             os.remove(file_name)
@@ -303,7 +349,7 @@ class Simulator:
 
             self.__debug_print(f'Metric per round file saved at {file_name}')
 
-    def __plot_metrics_per_round(self):
+    def __plot_metrics_per_round_evolution(self):
         """Gera um gráfico com as a evolução das métricas E[NQ1], E[NQ2], E[W1], E[W2]."""
         
         def build_title():
@@ -824,7 +870,7 @@ class Simulator:
 
         self.__generate_round_metrics()
 
-        if(self.__current_round > 0):
+        if(self.__current_round > 0 and self.__target_precision != None):
             precisions_above_target = []
 
             for a in self.__metric_estimators_simulation:
@@ -837,7 +883,7 @@ class Simulator:
                     if(precision > self.__target_precision):
                         precisions_above_target.append((a, precision))
             
-            print(f'metrics with precision above target: {precisions_above_target}')
+            #print(f'metrics with precision above target: {precisions_above_target}')
 
             if(len(precisions_above_target) == 0):
                 self.__simulation_running = False
@@ -1185,10 +1231,12 @@ class Simulator:
                 os.mkdir(self.__results_folder)
 
                 if (self.__opt_save_metric_per_round_file):
-                    self.__save_metric_per_round_file()
+                    self.__save_metric_per_round_evolution_file()
 
                 if (self.__opt_save_raw_event_log_file):
                     self.__save_event_logs_raw_file()
 
                 if (self.__opt_plot_metrics_per_round):
-                    self.__plot_metrics_per_round()
+                    self.__plot_metrics_per_round_evolution()
+                
+                self.__save_simulation_metrics_file()

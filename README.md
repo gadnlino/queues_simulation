@@ -134,17 +134,17 @@ Para as métricas referentes ao número de clientes no sistema e em cada fila de
 
 Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é calculado o valor absoluto para cada um dos clientes, e, ao final da rodada, ou seja, após a partida de k clientes, calcula-se o valor médio e a variância para a rodada. Nesse momento, é incrementa-se o estimador global para a média e variância do valor médio das rodadas. No gráfico gerado ao final das rodadas, esse valor é representado por uma linha tracejada, por ex:
 
-[Médias da simulação (linhas azuis e vermelhgas tracejadas)](./images/example_mean_values.png)
+[Médias da simulação (linhas azuis e vermelhas tracejadas)](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png))
 
 ## Teste de correção dos resultados
 
 Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Em um cenário que há infinitas chegadas ao sistema, é necessário que cada cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema. Caso contrário, o simulador permanece em execução eternamente. Nesse cenário, os clientes teriam tempo de espera em fila nulo. Isso foi atestado ao rodar com os parâmetros abaixo:
 
-| inter_arrival_time(s) 	| service_time(s) 	| number_of_rounds 	| samples_per_round 	| services_until_steady_state 	| E[W1] 	| E[W2] 	| termina execução? 	|
-|-----------------------	|-----------------	|------------------	|-------------------	|-----------------------------	|-------	|-------	|-------------------	|
-| 1.0                   	| 2.1             	| 20               	| 50                	| 10000                       	| -     	| -     	| não               	|
-| 2.1                   	| 1.0             	| 20               	| 50                	| 10000                       	| 0     	| 0     	| sim               	|
-| 2.0                   	| 1.0             	| 20               	| 50                	| 10000                       	| 0     	| 0     	| sim               	|
+| tempo entre chegadas 	| tempo de serviço 	| rodadas 	| amostras / rodada 	| fase transiente 	| termina execução? 	|
+|-----------------------	|-----------------	|------------------	|-------------------	|-----------------------------	|-------------------	|
+| 1.0                   	| 2.1             	| 20               	| 50                	| 10000                       	| não               	|
+| 2.1                   	| 1.0             	| 20               	| 50                	| 10000                       	| sim               	|
+| 2.0                   	| 1.0             	| 20               	| 50                	| 10000                       	| sim               	|
 
 ## Determinação do intervalo de confiança e número de rodadas
 
@@ -162,31 +162,31 @@ Dado isso, analisei o número de serviços executados pelo sistema até que entr
 
 De maneira geral, observou-se que com 10000 serviços executados(realizando a execução com os parametros `number_of_rounds`=200, `samples_per_round`=50, `services_until_steady_state`=0), o sistema já se encontrava em equilibrio para as taxas de utilização menores do que 0.5:
 
-[rho = 0.2](./images/wait_time_10000_services_lambda_02.png)
+[rho = 0.2](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_10000_services_lambda_02.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_10000_services_lambda_02.png))
 
-[rho = 0.4](./images/wait_time_10000_services_lambda_04.png)
+[rho = 0.4](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_10000_services_lambda_04.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_10000_services_lambda_04.png))
 
 Com relação ao número ótimo de amostras por rodada, após algumas simulações com diferentes valores, foi observado que com k = 50 amostras por rodada fornecia um resultado razoável em relação à variancia e oferecendo um tempo de simulação mais rápido do que com quantidades maiores. Não foi observado diferença considerável na co-variância para valores de k acima deste. Abaixo estão alguns resultados com diferentes valores de k(observar as colunas terminadas por '_cov_var', em especial 'N2_cov_var' e 'NQ2_cov_var', que apresentam os maiores valores).
 
-[k = 50](./files/metric_per_round_k_50.csv)
+[k = 50](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_50.csv)([link](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_50.csv))
 
-[k = 100](./files/metric_per_round_k_100.csv)
+[k = 100](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_100.csv)([link](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_100.csv))
 
-[k = 200](./files/metric_per_round_k_200.csv)
+[k = 200](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_200.csv)([link](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_200.csv))
 
-[k = 1000](./files/metric_per_round_k_1000.csv)
+[k = 1000](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_1000.csv)([link](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_1000.csv))
 
 ## Análise dos resultados
 
 Ao executar a simulação para os diferentes valores da taxa de utilização, fica claro a relação entre essa taxa e a convergência da fila para um estado de equilibrio; Ao executar com taxas maiores do que 0.5, o número de clientes na fila 2 e o tempo de espera médio aumentam indefinidamente!
 
-[Número médio de clientes na fila, lambda=0.49](./images/q_size_lambda_049.png)
+[Número médio de clientes na fila, lambda=0.49](https://github.com/gadnlino/queues_simulation/raw/main/images/q_size_lambda_049.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/q_size_lambda_049.png))
 
-[Atraso médio, lambda=0.49](./images/wait_time_lambda_049.png)
+[Atraso médio, lambda=0.49](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_lambda_049.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_lambda_049.png))
 
-[Número médio de clientes na fila, lambda=0.51](./images/q_size_lambda_051.png)
+[Número médio de clientes na fila, lambda=0.51](https://github.com/gadnlino/queues_simulation/raw/main/images/q_size_lambda_051.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/q_size_lambda_051.png))
 
-[Atraso médio, lambda=0.51](./images/wait_time_lambda_051.png)
+[Atraso médio, lambda=0.51](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_lambda_051.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/wait_time_lambda_051.png))
 
 ## Chegando ao fator mínimo
 
@@ -203,19 +203,19 @@ Os valores abaixo mostram a quantidade de rodadas até que todas as métricas co
 | teste | utilizacao | taxa de serviço | seed     | número de rodadas | coletas por rodada | partidas desprezadas | fator mínimo | tempo(segundos) |
 | ----- | ---------- | --------------- | -------- | ----------------- | ------------------ | -------------------- | ------------ | --------------- |
 | 1     | 0.2        | 1.0             | 0        | 3071              | 50                 | 10000                | 163550       | 137,18          |
-| 2     | 0.2        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 137,36          |
-| 3     | 0.2        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 136,47          |
-| 5     | 0.4        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 142,86          |
-| 6     | 0.4        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 159,34          |
+| 2     | 0.2        | 1.0             | 10^3     | 3071              | 50                 | 10000                | 163550       | 137,36          |
+| 3     | 0.2        | 1.0             | 10^7 | 3071              | 50                 | 10000                | 163550       | 136,47          |
+| 5     | 0.4        | 1.0             | 10^3     | 3071              | 50                 | 10000                | 163550       | 142,86          |
+| 6     | 0.4        | 1.0             | 10^7 | 3071              | 50                 | 10000                | 163550       | 159,34          |
 | 7     | 0.6        | 1.0             | 0        | 3071              | 50                 | 10000                | 163550       | 137,99          |
-| 8     | 0.6        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 145,02          |
-| 9     | 0.6        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 136,32          |
+| 8     | 0.6        | 1.0             | 10^3     | 3071              | 50                 | 10000                | 163550       | 145,02          |
+| 9     | 0.6        | 1.0             | 10^7 | 3071              | 50                 | 10000                | 163550       | 136,32          |
 | 10    | 0.8        | 1.0             | 0        | 3071              | 50                 | 10000                | 163550       | 140,22          |
-| 11    | 0.8        | 1.0             | 1000     | 3071              | 50                 | 10000                | 163550       | 137,75          |
-| 12    | 0.8        | 1.0             | 10000000 | 3071              | 50                 | 10000                | 163550       | 156,90          |
+| 11    | 0.8        | 1.0             | 10^3     | 3071              | 50                 | 10000                | 163550       | 137,75          |
+| 12    | 0.8        | 1.0             | 10^7 | 3071              | 50                 | 10000                | 163550       | 156,90          |
 | 13    | 0.9        | 1.0             | 0        | 3598              | 50                 | 10000                | 189900       | 159,83          |
-| 14    | 0.9        | 1.0             | 1000     | 3166              | 50                 | 10000                | 168300       | 141,38          |
-| 15    | 0.9        | 1.0             | 10000000 | 3453              | 50                 | 10000                | 182650       | 154,99          |
+| 14    | 0.9        | 1.0             | 10^3     | 3166              | 50                 | 10000                | 168300       | 141,38          |
+| 15    | 0.9        | 1.0             | 10^7 | 3453              | 50                 | 10000                | 182650       | 154,99          |
 
 ## Conclusões
 
@@ -231,7 +231,7 @@ Os valores abaixo mostram a quantidade de rodadas até que todas as métricas co
 
 ## Instruções para execução do simulador
 
-Para a execução, é necessário instalar a versão [versão 3.11.1 do Python](https://www.python.org/downloads/release/python-3111/).
+Para a execução, é necessário instalar a versão [versão 3.11.1 do Python](https://www.python.org/downloads/release/python-3111/)([link](https://www.python.org/downloads/release/python-3111/)).
 
 Após a instalação, para realizar o download das dependências do projeto, executar o seguinte comando abaixo a partir da pasta raiz:
 

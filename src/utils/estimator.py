@@ -37,11 +37,17 @@ class Estimator:
     def variance_ci(self, confidence : float):
         alpha = 1-confidence
 
-        low_ppf = stats.chi2.ppf(alpha / 2, self.__n - 1)
-        high_ppf = stats.chi2.ppf(1 - alpha / 2, self.__n - 1)
+        # low_ppf = stats.chi2.ppf(alpha / 2, self.__n - 1)
+        # high_ppf = stats.chi2.ppf(1 - alpha / 2, self.__n - 1)
 
-        upper = (self.__n - 1) * self.variance() / low_ppf
-        lower = (self.__n - 1) * self.variance() / high_ppf
+        # upper = (self.__n - 1) * self.variance() / low_ppf
+        # lower = (self.__n - 1) * self.variance() / high_ppf
+
+        low_ppf = stats.chi2.ppf(alpha / 2, self.__n)
+        high_ppf = stats.chi2.ppf(1 - alpha / 2, self.__n)
+
+        upper = (self.__n) * self.variance() / low_ppf
+        lower = (self.__n) * self.variance() / high_ppf
 
         precision = (high_ppf - low_ppf) / (high_ppf + low_ppf)
 

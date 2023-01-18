@@ -20,21 +20,23 @@ No loop principal, é gerado o evento inicial de chegada do cliente(evento ARRIV
 
 Ao final da simulação, há a opção de gerar arquivos com as métricas a cada rodada e gráficos com a evolução desses valores. Os arquivos são salvos na pasta de resultados da simulação('results_{timestamp}/').
 
-Os eventos da simulação podem ser dos seguintes tipos:
+Os eventos gerados na simulação são observados do ponto de vista do ciclo de vida de um freguês típico ao passar pelo sistema(chegada na fila 1, inicio do primeiro serviço, fim do serviço, chegada na fila 2, etc.), e são dos seguintes tipos:
 
-- `EventType.ARRIVAL`: é a chegada de um novo cliente ao sistema. Caso o sistema se encontre vazio, o cliente recém chegado inicia imediatamente o serviço. Se o serviço corrente for um cliente oriudo da fila de menor prioridade, o serviço é interrompido e o cliente recém chegado inicia a sua execução. Nos demais casos, o cliente é enfileirado na fila de maior prioridade. É nesse momento que novas chegadas ao sistema são agendadas.
+- `EventType.ARRIVAL`: é a chegada de um novo cliente à fila 1. Caso o sistema se encontre vazio, o cliente recém chegado inicia imediatamente o serviço. Caso haja um cliente oriundo da fila 2 em serviço, esse tem o serviço interrompido, e o cliente recém chegado inicia o seu serviço imediatamente. Após esse tratamento, é programado um evento para a próxima chegada de um cliente na fila 1.
 
-- `EventType.START_SERVICE_1`: início do primeiro serviço do cliente, oriundo da fila de maior prioridade. É obtido o tempo de serviço e agendado um evento de término desse primeiro serviço.
+- `EventType.START_SERVICE_1`:é o início do primeiro serviço do cliente, que foi oriundo da fila 1. O tempo de serviço é obtido a partir da taxa/tempo especificados na inicialização do simulador. Um evento de término de serviço é agendado para o cliente.
 
-- `EventType.END_SERVICE_1`: término do primeiro serviço do cliente. Se não houverem serviços em execução, o cliente inicia o segundo serviço imediatamente. Caso contrário, é direcionado para a fila de menor prioridade.
+- `EventType.END_SERVICE_1`: é o término do primeiro serviço do cliente. Caso não hajam clientes em nenhuma das duas filas, o cliente atual inicia o seu segundo serviço imediatamente. Se houver cliente na fila 1, esse tem prioridade no início do seu serviço; Caso contrário, o primeiro cliente da fila 2 tem a sua execução iniciada.
 
-- `EventType.START_SERVICE_2`: início do segundo serviço do cliente, oriundo da fila de menor prioridade. É obtido o tempo de serviço e agendado o evento de partida do sistema para o momento do término do serviço.
+- `EventType.START_SERVICE_2`:é o início do segundo serviço do cliente, que foi oriundo da fila 2. É obtido o tempo de serviço taxa/tempo especificados e agendado o evento de partida da fila 2 para o momento do término do serviço.
 
-- `EventType.HALT_SERVICE_2`: interrupção do segundo serviço do cliente. Acontece sempre que um novo cliente chega ao sistema durante um serviço oriundo da fila de menor prioridade. Quando esse evento ocorre, é necessário remover a partida do cliente que teve seu serviço interrompido.
+- `EventType.HALT_SERVICE_2`: é a interrupção do segundo serviço do cliente. Acontece sempre que um novo cliente chega na fila 1 durante um serviço em execução oriundo da fila 2. Quando esse evento ocorre, é removido o evento de partida da fila 2 que havia sido agendado para o cliente que estava em execução.
 
-- `EventType.DEPARTURE`: o término do segundo serviço do cliente, e a sua subsequente partida do sistema. Se houverem novos cliente para serem servidos, tem-se o serviço iniciado, seguindo a ordem de prioridade das filas.
+- `EventType.DEPARTURE`:é o término do segundo serviço do cliente, e a sua subsequente partida da fila 2 e do sistema como um todo. Se houverem clientes em alguma das fila, eles tem o serviço iniciado seguindo a ordem de prioridade das filas.
 
 Ao final de cada rodada, a média e a variância amostral são obtidas a partir das amostras obtidas durante o tratamento dos eventos.
+
+**Observação**: poderia ter sido escolhido somente 2 tipos de eventos(chegadas e partidas, com o número da fila correspondente como parâmetro extra). Porém, foi escolhido particionar nos 6 eventos descritos acima a fim de  melhorar a legibilidade e a manutenibilidade do código do simulador.
 
 ### Simulador
 
@@ -134,9 +136,9 @@ $$x_0 = {\log{u_0} \over -\lambda}$$
 
 ### Amostragem
 
-Para as métricas referentes ao número de clientes no sistema e em cada fila de espera, a coleta é realizada a cada tratamento de evento da simulação. Isso permitiu uma maior precisão para as estimativas relacionados à fila 2, que tem seus eventos associados tratados somente após os eventos da fila 1 devido à precedência de prioridade.
+Para as métricas referentes ao número de clientes no sistema e em cada fila espera, a coleta é realizada a cada tratamento de evento da simulação. Isso permitiu uma maior precisão para as estimativas relacionados à fila 2, que tem seus eventos associados tratados somente após os eventos da fila 1 devido à precedência de prioridade.
 
-Para a média dos tempos em fila de espera, tempo de serviço e tempo total, é calculado o valor absoluto para cada um dos clientes, e, ao final da rodada, ou seja, após a partida de k clientes, calcula-se o valor médio e a variância para a rodada. Nesse momento, é incrementa-se o estimador global para a média e variância do valor médio das rodadas. No gráfico gerado ao final das rodadas, esse valor é representado por uma linha tracejada, por ex:
+Para a média dos tempos em fila espera, tempo de serviço e tempo total, é calculado o valor absoluto para cada um dos clientes, e, ao final da rodada, ou seja, após a partida de k clientes, calcula-se o valor médio e a variância para a rodada. Nesse momento, é incrementa-se o estimador global para a média e variância do valor médio das rodadas. No gráfico gerado ao final das rodadas, esse valor é representado por uma linha tracejada, por ex:
 
 [Médias da simulação (linhas azuis e vermelhas tracejadas)](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png))
 

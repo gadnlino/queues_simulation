@@ -129,8 +129,6 @@ class Simulator3:
                 service_time = self.get_service_time()
                 self.set_current_service(next_client_id, 2, service_time)
                 self.insert_event(DEPARTURE, 2, self.__current_timestamp + service_time, next_client_id)
-            elif(len(self.__waiting_qs[0]) > 0 and self.__current_service == None):
-                pass
         elif(event_type == DEPARTURE and event_queue == 1):
             self.remove_current_service()
 

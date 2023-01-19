@@ -5,7 +5,8 @@ ARRIVAL = 'ARRIVAL'
 DEPARTURE = 'DEPARTURE'
 
 class Simulator3:
-    def __init__(self) -> None:
+    def __init__(self,
+    save_raw_event_log_file = False) -> None:
         self.__event_q = []
         self.__waiting_qs = [[],[]]
         self.remove_current_service()
@@ -17,6 +18,9 @@ class Simulator3:
 
         self.__service_process = 'exponential'
         self.__service_rate = 1.0
+
+        self.__event_log = []
+        self.__save_raw_event_log_file = save_raw_event_log_file
     
     def get_client_counter(self):
         current = self.__client_counter
@@ -95,7 +99,6 @@ class Simulator3:
     def handle_event(self, event):
         event_type = event['event_type']
         event_queue = event['event_queue']
-        event_timestamp = event['event_timestamp']
         event_client = event['event_client']
 
         if(event_type == ARRIVAL and event_queue == 1):
@@ -158,6 +161,10 @@ class Simulator3:
 
         while(len(self.__event_q) > 0):
             event = self.__event_q.pop(0)
+            
+            if(self.__save_raw_event_log_file):
+                self.__event_log.append(event)
+
             self.__current_timestamp = event['event_timestamp']
 
             print(event, self.__current_service)

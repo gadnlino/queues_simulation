@@ -24,6 +24,7 @@ if (__name__ == "__main__"):
     #                     save_raw_event_log_file = False,
     #                     plot_metrics_per_round = True)
 
-    simulator = Simulator3()
-    
+    simulator = Simulator3(arrivals_until_steady_state=10000,
+                           save_raw_event_log_file=True)
+
     simulator.run()

@@ -1,5 +1,8 @@
 import random
 import math
+import csv
+import os
+from datetime import datetime
 
 ARRIVAL = 'ARRIVAL'
 DEPARTURE = 'DEPARTURE'
@@ -7,7 +10,11 @@ DEPARTURE = 'DEPARTURE'
 
 class Simulator3:
 
-    def __init__(self, save_raw_event_log_file=False) -> None:
+    def __init__(self,
+                 number_of_rounds=20,
+                 samples_per_round=50,
+                 arrivals_until_steady_state: int = 0,
+                 save_raw_event_log_file=False) -> None:
         self.__event_q = []
         self.__waiting_qs = [[], []]
         self.remove_current_service()
@@ -20,10 +27,45 @@ class Simulator3:
         self.__service_process = 'exponential'
         self.__service_rate = 1.0
 
+        self.__number_of_rounds = number_of_rounds
+        self.__samples_per_round = samples_per_round
+        self.__arrivals_until_steady_state = arrivals_until_steady_state
+
+        self.__current_round = 1
+        self.__number_of_arrivals = 0
+
         self.__interrupted_service = None
 
         self.__event_log = []
+        """Log de eventos(para depuração posterior)."""
         self.__save_raw_event_log_file = save_raw_event_log_file
+        """Flag para salvar o arquivo de log de eventos ao final da simulação"""
+        self.__results_folder = f'./results_{str(datetime.utcnow().timestamp()).replace(".", "")}'
+        """Pasta onde os arquivos de resultado da simulação serão salvos"""
+
+    def save_event_logs_raw_file(self):
+        """Salva o log de eventos em um arquivo .csv."""
+
+        event_log_file: str = f'{self.__results_folder}/event_log_raw.csv'
+        """Arquivo onde o log de eventos da simulação serão salvos"""
+
+        if (os.path.exists(event_log_file)):
+            os.remove(event_log_file)
+
+        if (len(self.__event_log) > 0):
+            with open(event_log_file, 'a+', newline='') as output_file:
+
+                # fieldnames = [
+                #     'round', 'reference', 'type', 'queue_number', 'timestamp',
+                #     'client_id', 'remaining_service_time', 'in_the_front'
+                # ]
+
+                fieldnames = list(self.__event_log[0].keys())
+
+                dict_writer = csv.DictWriter(output_file,
+                                             fieldnames=fieldnames)
+                dict_writer.writeheader()
+                dict_writer.writerows(self.__event_log)
 
     def get_client_counter(self):
         current = self.__client_counter
@@ -33,8 +75,9 @@ class Simulator3:
         return current
 
     def schedule_new_system_arrival(self, ):
-        arrival_time = self.get_arrival_time()
-        self.insert_event(ARRIVAL, 1, self.__current_timestamp + arrival_time,
+        if(self.__current_round <= self.__number_of_rounds):
+            arrival_time = self.get_arrival_time()
+            self.insert_event(ARRIVAL, 1, self.__current_timestamp + arrival_time,
                           self.get_client_counter())
 
     def insert_event(self, event_type, event_queue, event_timestamp,
@@ -159,6 +202,12 @@ class Simulator3:
                                       event_client)
 
             self.schedule_new_system_arrival()
+
+            self.__number_of_arrivals += 1
+
+            if(self.__number_of_arrivals >= self.__arrivals_until_steady_state + (self.__samples_per_round * self.__current_round)):
+                self.__current_round += 1
+            
         elif (event_type == ARRIVAL and event_queue == 2):
             self.__waiting_qs[1].append(event_client)
 
@@ -168,7 +217,9 @@ class Simulator3:
 
                 service_time = None
 
-                if(self.__interrupted_service != None and self.__interrupted_service['client'] == next_client_id):
+                if (self.__interrupted_service != None
+                        and self.__interrupted_service['client']
+                        == next_client_id):
                     service_time = self.__interrupted_service['remaining_time']
                     self.remove_interrupted_service()
                 else:
@@ -224,3 +275,8 @@ class Simulator3:
             print(event, self.__current_service)
 
             self.handle_event(event)
+        
+        os.mkdir(self.__results_folder)
+
+        if(self.__save_raw_event_log_file):
+            self.save_event_logs_raw_file()

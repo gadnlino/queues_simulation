@@ -24,7 +24,15 @@ if (__name__ == "__main__"):
     #                     save_raw_event_log_file = False,
     #                     plot_metrics_per_round = True)
 
-    simulator = Simulator3(arrivals_until_steady_state=10000,
-                           save_raw_event_log_file=True)
+    simulator = Simulator3(
+                            service_process= 'deterministic',
+                            arrival_process= 'deterministic',
+                            number_of_rounds=3000,
+                           samples_per_round=50,
+                           arrivals_until_steady_state=10000,
+                           #predefined_system_arrival_times=[1.0, 2.0, 4.0],
+                           seed = 10000000,
+                           save_raw_event_log_file=True,
+                           plot_metrics_per_round = True)
 
     simulator.run()

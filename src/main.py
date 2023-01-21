@@ -25,9 +25,13 @@ if (__name__ == "__main__"):
     #                     plot_metrics_per_round = True)
 
     simulator = Simulator3(
-                            service_process= 'deterministic',
-                            arrival_process= 'deterministic',
-                            number_of_rounds=3000,
+                            #service_process= 'deterministic',
+                            service_process= 'exponential',
+                            #arrival_process= 'deterministic',
+                            arrival_process= 'exponential',
+                            utilization_pct=0.9,
+                            service_rate=1.0,
+                            number_of_rounds=4000,
                            samples_per_round=50,
                            arrivals_until_steady_state=10000,
                            #predefined_system_arrival_times=[1.0, 2.0, 4.0],

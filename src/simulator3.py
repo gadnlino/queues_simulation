@@ -422,7 +422,7 @@ class Simulator3:
                     'confidence':
                     self.__confidence,
                     'rounds':
-                    self.__current_round + 1
+                    self.__current_round
                 })
 
             dict_writer = csv.DictWriter(output_file, fieldnames=fieldnames)
@@ -611,8 +611,9 @@ class Simulator3:
                 (self.__samples_per_round * self.__current_round)):
                 self.advance_round()
 
-            #coleta métricas da fila 1
+            #coleta métricas das filas
             self.collect_queue_size_metrics(1)
+            self.collect_queue_size_metrics(2)
         elif (event_type == ARRIVAL and event_queue == 2):
 
             #sistema está ocioso
@@ -626,7 +627,8 @@ class Simulator3:
             else:
                 self.insert_in_waiting_queue(2, event_client)
 
-            #coleta métricas da fila 2
+            #coleta métricas das filas
+            self.collect_queue_size_metrics(1)
             self.collect_queue_size_metrics(2)
         elif (event_type == DEPARTURE and event_queue == 1):
             self.remove_current_service()
@@ -666,8 +668,9 @@ class Simulator3:
             self.insert_event(ARRIVAL, 2, self.__current_timestamp,
                               event_client)
 
-            #coleta métricas da fila 1
+            #coleta métricas das filas
             self.collect_queue_size_metrics(1)
+            self.collect_queue_size_metrics(2)
         elif (event_type == DEPARTURE and event_queue == 2):
             self.remove_current_service()
 
@@ -688,7 +691,8 @@ class Simulator3:
 
             self.remove_client_from_system(event_client)
 
-            #coleta métricas da fila 2
+            #coleta métricas das filas
+            self.collect_queue_size_metrics(1)
             self.collect_queue_size_metrics(2)
 
     def run(self, ):
@@ -708,7 +712,7 @@ class Simulator3:
 
             self.__current_timestamp = event['event_timestamp']
 
-            self.debug_print(event, self.__current_service)
+            #self.debug_print(event, self.__current_service)
 
             self.handle_event(event)
 

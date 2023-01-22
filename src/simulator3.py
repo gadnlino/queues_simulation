@@ -13,10 +13,7 @@ ARRIVAL = 'ARRIVAL'
 DEPARTURE = 'DEPARTURE'
 
 #partidas são processadas primeiro do que as chegadas às filas
-EVENT_PRIORITY = {
-    DEPARTURE: 0,
-    ARRIVAL: 1
-}
+EVENT_PRIORITY = {DEPARTURE: 0, ARRIVAL: 1}
 
 #tipos de métricas
 METRIC_TYPES = [
@@ -31,11 +28,12 @@ MEAN_VAR_COLUMNS = sorted(
     list(map(lambda x: f'{str(x)}{MEAN_SUFFIX}', METRIC_TYPES)) +
     list(map(lambda x: f'{str(x)}{VARIANCE_SUFFIX}', METRIC_TYPES)))
 
+
 class Simulator3:
 
     def __init__(self,
                  arrival_process: str = 'exponential',
-                 inter_arrival_time : float = None,
+                 inter_arrival_time: float = None,
                  service_process: str = 'exponential',
                  utilization_pct: float = 0.5,
                  service_rate: float = 1.0,
@@ -177,9 +175,10 @@ class Simulator3:
         for e in self.__event_q:
             if (e['event_timestamp'] > event_timestamp):
                 break
-            
-            if(e['event_timestamp'] == event_timestamp and 
-                EVENT_PRIORITY[e['event_type']] > EVENT_PRIORITY[event_type]):
+
+            if (e['event_timestamp'] == event_timestamp
+                    and EVENT_PRIORITY[e['event_type']] >
+                    EVENT_PRIORITY[event_type]):
                 break
 
             index += 1
@@ -231,13 +230,14 @@ class Simulator3:
         service_client = self.__current_service['client']
         service_queue = self.__current_service['queue']
         service_time = self.__current_service['service_time']
+        start_time = self.__current_service['start_time']
 
         if (service_queue == 1):
             self.__clients_in_system[service_client]['metrics'][str(
-                MetricType.X1)] += service_time
+                MetricType.X1)] += (self.__current_timestamp - start_time)
         elif (service_queue == 2):
             self.__clients_in_system[service_client]['metrics'][str(
-                MetricType.X2)] += service_time
+                MetricType.X2)] += (self.__current_timestamp - start_time)
 
         self.__current_service = None
 
@@ -247,8 +247,6 @@ class Simulator3:
             'queue': queue,
             'start_time': start_time,
             'service_time': service_time,
-            'remaining_time':
-            (start_time + service_time) - self.__current_timestamp,
             'interruption_time': self.__current_timestamp
         }
 
@@ -283,12 +281,8 @@ class Simulator3:
         else:
             self.__waiting_qs[queue_number - 1].append(client)
 
-        #self.collect_queue_size_metrics(queue_number)
-
     def pop_from_waiting_queue(self, queue_number: int):
         client = self.__waiting_qs[queue_number - 1].pop(0)
-
-        #self.collect_queue_size_metrics(queue_number)
 
         return client
 
@@ -389,12 +383,14 @@ class Simulator3:
         if (os.path.exists(simulation_metrics_file)):
             os.remove(simulation_metrics_file)
 
-        with open(simulation_metrics_file, 'a+',
-                    newline='') as output_file:
+        with open(simulation_metrics_file, 'a+', newline='') as output_file:
 
             #fieldnames = list(map(lambda x: str(x), self.__metric_estimators_simulation.keys()))
 
-            fieldnames = ['metric', 'lower', 'mean', 'upper', 'variance', 'precision', 'confidence', 'rounds']
+            fieldnames = [
+                'metric', 'lower', 'mean', 'upper', 'variance', 'precision',
+                'confidence', 'rounds'
+            ]
 
             rows = []
 
@@ -403,28 +399,38 @@ class Simulator3:
                 upper = ''
                 precision = ''
 
-                if(metric.endswith(MEAN_SUFFIX)):
-                    lower, upper, precision = self.__metric_estimators_simulation[metric].mean_ci(confidence=self.__confidence)
-                elif(metric.endswith(VARIANCE_SUFFIX)):
-                    lower, upper, precision = self.__metric_estimators_simulation[metric].variance_ci(confidence=self.__confidence)
-                
-                rows.append({
-                    'metric':metric,
-                    'lower':lower,
-                    'mean':self.__metric_estimators_simulation[metric].mean(),
-                    'upper': upper,
-                    'variance':self.__metric_estimators_simulation[metric].variance(),
-                    'precision': precision,
-                    'confidence': self.__confidence,
-                    'rounds': self.__current_round + 1
-                })                    
+                if (metric.endswith(MEAN_SUFFIX)):
+                    lower, upper, precision = self.__metric_estimators_simulation[
+                        metric].mean_ci(confidence=self.__confidence)
+                elif (metric.endswith(VARIANCE_SUFFIX)):
+                    lower, upper, precision = self.__metric_estimators_simulation[
+                        metric].variance_ci(confidence=self.__confidence)
 
-            dict_writer = csv.DictWriter(output_file,
-                                            fieldnames=fieldnames)
+                rows.append({
+                    'metric':
+                    metric,
+                    'lower':
+                    lower,
+                    'mean':
+                    self.__metric_estimators_simulation[metric].mean(),
+                    'upper':
+                    upper,
+                    'variance':
+                    self.__metric_estimators_simulation[metric].variance(),
+                    'precision':
+                    precision,
+                    'confidence':
+                    self.__confidence,
+                    'rounds':
+                    self.__current_round + 1
+                })
+
+            dict_writer = csv.DictWriter(output_file, fieldnames=fieldnames)
             dict_writer.writeheader()
             dict_writer.writerows(rows)
-        
-            self.debug_print(f'Final simulation results saved at {simulation_metrics_file}')
+
+            self.debug_print(
+                f'Final simulation results saved at {simulation_metrics_file}')
 
     def plot_metrics_per_round_evolution(self):
         """Gera gráficos com as a evolução das métricas coletadas na simulação."""
@@ -522,12 +528,16 @@ class Simulator3:
         client_id : str
             O id do cliente."""
 
-        #consolidando T1 e T2 para o cliente
-        self.__clients_in_system[client]['metrics'][str(MetricType.T1)] = \
-            self.__clients_in_system[client]['metrics'][str(MetricType.X1)] + self.__clients_in_system[client]['metrics'][str(MetricType.W1)]
+        x1 = self.__clients_in_system[client]['metrics'][str(MetricType.X1)]
+        w1 = self.__clients_in_system[client]['metrics'][str(MetricType.W1)]
 
-        self.__clients_in_system[client]['metrics'][str(MetricType.T2)] = \
-            self.__clients_in_system[client]['metrics'][str(MetricType.X2)] + self.__clients_in_system[client]['metrics'][str(MetricType.W2)]
+        #consolidando os valores de T1 e T2 para o cliente
+        self.__clients_in_system[client]['metrics'][str(MetricType.T1)] = x1 + w1
+
+        x2 = self.__clients_in_system[client]['metrics'][str(MetricType.X2)]
+        w2 = self.__clients_in_system[client]['metrics'][str(MetricType.W2)]
+
+        self.__clients_in_system[client]['metrics'][str(MetricType.T2)] = x2 + w2
 
         client_metrics = list(
             self.__clients_in_system[client]['metrics'].keys())
@@ -548,36 +558,50 @@ class Simulator3:
 
         if (event_type == ARRIVAL and event_queue == 1):
 
-            if (self.__current_service == None):
-                service_time = self.get_service_time()
-                self.set_current_service(event_client, 1, service_time)
-                self.insert_event(DEPARTURE, 1,
-                                  self.__current_timestamp + service_time,
-                                  event_client)
-            else:
-                service_client = self.__current_service['client']
-                service_queue = self.__current_service['queue']
-
-                if (service_queue == 1):
-                    self.insert_in_waiting_queue(1, event_client)
-                elif (service_queue == 2):
-                    self.cancel_current_service_system_departure_event()
-                    self.set_interrupted_service(
-                        self.__current_service['client'],
-                        self.__current_service['queue'],
-                        self.__current_service['start_time'],
-                        self.__current_service['service_time'])
-                    self.remove_current_service()
-                    self.insert_in_waiting_queue(2,
-                                                 service_client,
-                                                 in_the_front=True)
-
+            #fila 1 está vazia, 
+            if(len(self.__waiting_qs[0]) == 0):
+                
+                #não há serviço corrente, inicia o serviço do cliente recém chegado
+                if (self.__current_service == None):
                     service_time = self.get_service_time()
                     self.set_current_service(event_client, 1, service_time)
                     self.insert_event(DEPARTURE, 1,
-                                      self.__current_timestamp + service_time,
-                                      event_client)
+                                    self.__current_timestamp + service_time,
+                                    event_client)
 
+                #há serviço corrente
+                else:
+                    service_client = self.__current_service['client']
+                    service_queue = self.__current_service['queue']
+
+                    #serviço corrente é da fila 1, cliente recém chegado vai para a fila de espera
+                    if (service_queue == 1):
+                        self.insert_in_waiting_queue(1, event_client)
+
+                    #serviço corrente é da fila 2
+                    #interrompe serviço da fila 2
+                    #cliente recém chegado inicia o seu serviço
+                    elif (service_queue == 2):
+                        self.cancel_current_service_system_departure_event()
+                        self.set_interrupted_service(
+                            self.__current_service['client'],
+                            self.__current_service['queue'],
+                            self.__current_service['start_time'],
+                            self.__current_service['service_time'])
+                        self.remove_current_service()
+                        self.insert_in_waiting_queue(2,
+                                                    service_client,
+                                                    in_the_front=True)
+
+                        service_time = self.get_service_time()
+                        self.set_current_service(event_client, 1, service_time)
+                        self.insert_event(DEPARTURE, 1,
+                                        self.__current_timestamp + service_time,
+                                        event_client)
+            elif(len(self.__waiting_qs[0]) > 0):
+                self.insert_in_waiting_queue(1, event_client)
+
+            #agenda nova chegada de cliente na fila 1
             self.schedule_new_system_arrival()
 
             self.__number_of_arrivals += 1
@@ -590,32 +614,18 @@ class Simulator3:
             #coleta métricas da fila 1
             self.collect_queue_size_metrics(1)
         elif (event_type == ARRIVAL and event_queue == 2):
-            self.insert_in_waiting_queue(2, event_client)
 
-            if (len(self.__waiting_qs[0]) == 0
-                    and self.__current_service == None):
-                next_client_id = self.pop_from_waiting_queue(2)
-                service_time = None
-                remove_interrumpted_service = False
-
-                if (self.__interrupted_service != None
-                        and self.__interrupted_service['client']
-                        == next_client_id):
-                    service_time = self.__interrupted_service['remaining_time']
-                    remove_interrumpted_service = True
-
-                else:
-                    service_time = self.get_service_time()
-
-                self.set_current_service(next_client_id, 2, service_time)
-
-                if (remove_interrumpted_service):
-                    self.remove_interrupted_service()
-
+            #sistema está ocioso
+            #cliente recém chegado a fila 2 inicia o seu serviço
+            if(len(self.__waiting_qs[0]) == 0 and len(self.__waiting_qs[1]) == 0 and self.__current_service == None):
+                service_time = self.get_service_time()
+                self.set_current_service(event_client, 2, service_time)
                 self.insert_event(DEPARTURE, 2,
                                   self.__current_timestamp + service_time,
-                                  next_client_id)
-                
+                                  event_client)
+            else:
+                self.insert_in_waiting_queue(2, event_client)
+
             #coleta métricas da fila 2
             self.collect_queue_size_metrics(2)
         elif (event_type == DEPARTURE and event_queue == 1):
@@ -626,6 +636,30 @@ class Simulator3:
                 service_time = self.get_service_time()
                 self.set_current_service(next_client_id, 1, service_time)
                 self.insert_event(DEPARTURE, 1,
+                                  self.__current_timestamp + service_time,
+                                  next_client_id)
+            elif (len(self.__waiting_qs[1]) > 0):
+                next_client_id = self.pop_from_waiting_queue(2)
+                service_time = None
+                remove_interrumpted_service = False
+
+                if (self.__interrupted_service != None
+                        and self.__interrupted_service['client']
+                        == next_client_id):
+                    service_time = self.__interrupted_service[
+                        'start_time'] + self.__interrupted_service[
+                            'service_time'] - self.__interrupted_service[
+                                'interruption_time']
+                    remove_interrumpted_service = True
+                else:
+                    service_time = self.get_service_time()
+
+                self.set_current_service(next_client_id, 2, service_time)
+
+                if (remove_interrumpted_service):
+                    self.remove_interrupted_service()
+
+                self.insert_event(DEPARTURE, 2,
                                   self.__current_timestamp + service_time,
                                   next_client_id)
 
@@ -688,5 +722,5 @@ class Simulator3:
 
         if (self.__opt_plot_metrics_per_round):
             self.plot_metrics_per_round_evolution()
-        
+
         self.save_simulation_metrics_file()

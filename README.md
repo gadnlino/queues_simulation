@@ -160,7 +160,7 @@ A fila 1 não sofre interrupção, então:
 
 $$E[W_1] = {\rho_1 E[X_{1r}] \over {1-\rho_1}}$$
 
-Como os tempos de serviços seguem uma distribuição exponencial,
+Como os tempos de serviço seguem uma distribuição exponencial,
 
 $$E[X_{1r}] = E[X_1] = {1 \over \mu }$$
 

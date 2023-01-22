@@ -8,29 +8,38 @@ from utils.estimator import Estimator
 import pandas as pd
 import matplotlib.pyplot as plt
 
+#tipos de eventos
 ARRIVAL = 'ARRIVAL'
 DEPARTURE = 'DEPARTURE'
 
+#partidas são processadas primeiro do que as chegadas às filas
+EVENT_PRIORITY = {
+    DEPARTURE: 0,
+    ARRIVAL: 1
+}
+
+#tipos de métricas
 METRIC_TYPES = [
     MetricType.W1, MetricType.W2, MetricType.X1, MetricType.X2, MetricType.T1,
     MetricType.T2, MetricType.NQ1, MetricType.NQ2, MetricType.N1, MetricType.N2
 ]
 
+#variáveis auxiliares para geração de métricas
 MEAN_SUFFIX = '_est_mean'
 VARIANCE_SUFFIX = '_est_var'
-
 MEAN_VAR_COLUMNS = sorted(
     list(map(lambda x: f'{str(x)}{MEAN_SUFFIX}', METRIC_TYPES)) +
     list(map(lambda x: f'{str(x)}{VARIANCE_SUFFIX}', METRIC_TYPES)))
-
 
 class Simulator3:
 
     def __init__(self,
                  arrival_process: str = 'exponential',
+                 inter_arrival_time : float = None,
                  service_process: str = 'exponential',
                  utilization_pct: float = 0.5,
                  service_rate: float = 1.0,
+                 service_time: float = None,
                  number_of_rounds=20,
                  samples_per_round=50,
                  arrivals_until_steady_state: int = 0,
@@ -56,9 +65,11 @@ class Simulator3:
         self.__arrival_process = arrival_process
         self.__arrival_rate = self.__utilization_pct / 2.0
         """Pelo enunciado do trabalho, 2*lambda = rho"""
+        self.__inter_arrival_time = inter_arrival_time
 
         self.__service_process = service_process
         self.__service_rate = service_rate
+        self.__service_time = service_time
 
         self.__number_of_rounds = number_of_rounds
         self.__samples_per_round = samples_per_round
@@ -166,6 +177,10 @@ class Simulator3:
         for e in self.__event_q:
             if (e['event_timestamp'] > event_timestamp):
                 break
+            
+            if(e['event_timestamp'] == event_timestamp and 
+                EVENT_PRIORITY[e['event_type']] > EVENT_PRIORITY[event_type]):
+                break
 
             index += 1
 
@@ -268,12 +283,12 @@ class Simulator3:
         else:
             self.__waiting_qs[queue_number - 1].append(client)
 
-        self.collect_queue_size_metrics(queue_number)
+        #self.collect_queue_size_metrics(queue_number)
 
     def pop_from_waiting_queue(self, queue_number: int):
         client = self.__waiting_qs[queue_number - 1].pop(0)
 
-        self.collect_queue_size_metrics(queue_number)
+        #self.collect_queue_size_metrics(queue_number)
 
         return client
 
@@ -288,7 +303,7 @@ class Simulator3:
             u = random.random()
             return math.log(u) / (-self.__arrival_rate)
         elif (self.__arrival_process == 'deterministic'):
-            return self.__arrival_rate
+            return self.__inter_arrival_time
 
     def get_service_time(self):
         """Obtém o tempo de serviço de um cliente, a partir de uma distribuição exponencial com taxa self.__service_rate.
@@ -301,7 +316,7 @@ class Simulator3:
             u = random.random()
             return math.log(u) / (-self.__service_rate)
         elif (self.__service_process == 'deterministic'):
-            return self.__service_rate
+            return self.__service_time
 
     def advance_round(self, ):
         self.debug_print(f'completed round {self.__current_round + 1}')
@@ -572,6 +587,8 @@ class Simulator3:
                 (self.__samples_per_round * self.__current_round)):
                 self.advance_round()
 
+            #coleta métricas da fila 1
+            self.collect_queue_size_metrics(1)
         elif (event_type == ARRIVAL and event_queue == 2):
             self.insert_in_waiting_queue(2, event_client)
 
@@ -598,6 +615,9 @@ class Simulator3:
                 self.insert_event(DEPARTURE, 2,
                                   self.__current_timestamp + service_time,
                                   next_client_id)
+                
+            #coleta métricas da fila 2
+            self.collect_queue_size_metrics(2)
         elif (event_type == DEPARTURE and event_queue == 1):
             self.remove_current_service()
 
@@ -611,6 +631,9 @@ class Simulator3:
 
             self.insert_event(ARRIVAL, 2, self.__current_timestamp,
                               event_client)
+
+            #coleta métricas da fila 1
+            self.collect_queue_size_metrics(1)
         elif (event_type == DEPARTURE and event_queue == 2):
             self.remove_current_service()
 
@@ -631,6 +654,9 @@ class Simulator3:
 
             self.remove_client_from_system(event_client)
 
+            #coleta métricas da fila 2
+            self.collect_queue_size_metrics(2)
+
     def run(self, ):
 
         if (self.__predefined_system_arrival_times == None):
@@ -648,7 +674,7 @@ class Simulator3:
 
             self.__current_timestamp = event['event_timestamp']
 
-            #self.debug_print(event, self.__current_service)
+            self.debug_print(event, self.__current_service)
 
             self.handle_event(event)
 

@@ -7,6 +7,9 @@ from models.metric_type import MetricType
 from utils.estimator import Estimator
 import pandas as pd
 import matplotlib.pyplot as plt
+import inspect
+import json
+
 
 #tipos de eventos
 ARRIVAL = 'ARRIVAL'
@@ -119,8 +122,20 @@ class Simulator3:
         """Flag para salvar o arquivo de métricas por rodada ao final da simulação"""
         self.__opt_plot_metrics_per_round = plot_metrics_per_round
         """Flag para plotar um gráfico com a evolução das métricas ao final da simulação"""
-        self.__results_folder = f'./results_{str(datetime.utcnow().timestamp()).replace(".", "")}'
+        self.__results_folder = f'./results_{str(datetime.utcnow().timestamp()).replace(".", "")}_simulator3'
         """Pasta onde os arquivos de resultado da simulação serão salvos"""
+
+        param_names = []
+        for name, parameter in inspect.signature(self.__init__).parameters.items():
+            param_names.append(name)
+
+        self.__execution_parameters = {}
+
+        for k in self.__dict__:
+            name = k.removeprefix('_Simulator3__')
+            
+            if(name in param_names):
+                self.__execution_parameters[name] = self.__dict__[k]
 
     def debug_print(self, *message):
         # now = datetime.now()
@@ -229,7 +244,6 @@ class Simulator3:
     def remove_current_service(self, ):
         service_client = self.__current_service['client']
         service_queue = self.__current_service['queue']
-        service_time = self.__current_service['service_time']
         start_time = self.__current_service['start_time']
 
         if (service_queue == 1):
@@ -313,7 +327,7 @@ class Simulator3:
             return self.__service_time
 
     def advance_round(self, ):
-        self.debug_print(f'completed round {self.__current_round + 1}')
+        self.debug_print(f'completed round {self.__current_round}')
 
         self.__current_round += 1
 
@@ -431,6 +445,20 @@ class Simulator3:
 
             self.debug_print(
                 f'Final simulation results saved at {simulation_metrics_file}')
+
+    def save_execution_parameters_config(self):
+        signature = inspect.signature(self.__init__)
+
+        config_file: str = f'{self.__results_folder}/execution_parameters.json'
+        """Arquivo onde o log de eventos da simulação serão salvos"""
+
+        if (os.path.exists(config_file)):
+            os.remove(config_file)
+
+        with open(config_file, 'a+', newline='') as output_file:
+            output_file.write(json.dumps(self.__execution_parameters))
+
+            self.debug_print(f'Execution paramaters config saved at {config_file}')
 
     def plot_metrics_per_round_evolution(self):
         """Gera gráficos com as a evolução das métricas coletadas na simulação."""
@@ -579,7 +607,7 @@ class Simulator3:
                         self.insert_in_waiting_queue(1, event_client)
 
                     #serviço corrente é da fila 2
-                    #interrompe serviço da fila 2
+                    #interrompe serviço corrente, 
                     #cliente recém chegado inicia o seu serviço
                     elif (service_queue == 2):
                         self.cancel_current_service_system_departure_event()
@@ -617,13 +645,14 @@ class Simulator3:
         elif (event_type == ARRIVAL and event_queue == 2):
 
             #sistema está ocioso
-            #cliente recém chegado a fila 2 inicia o seu serviço
+            #cliente recém chegado a fila 2 inicia o seu serviço e tem sua partida da fila 2 agendada
             if(len(self.__waiting_qs[0]) == 0 and len(self.__waiting_qs[1]) == 0 and self.__current_service == None):
                 service_time = self.get_service_time()
                 self.set_current_service(event_client, 2, service_time)
                 self.insert_event(DEPARTURE, 2,
                                   self.__current_timestamp + service_time,
                                   event_client)
+            #sistema não está ocioso, cliente vai para a fila de espera 2
             else:
                 self.insert_in_waiting_queue(2, event_client)
 
@@ -633,6 +662,8 @@ class Simulator3:
         elif (event_type == DEPARTURE and event_queue == 1):
             self.remove_current_service()
 
+            #fila 1 tem clientes em espera
+            #inicia o serviço do primeiro cliente da fila 1
             if (len(self.__waiting_qs[0]) > 0):
                 next_client_id = self.pop_from_waiting_queue(1)
                 service_time = self.get_service_time()
@@ -674,6 +705,8 @@ class Simulator3:
         elif (event_type == DEPARTURE and event_queue == 2):
             self.remove_current_service()
 
+            #fila 1 não está vazia
+            #inicia serviço do primeiro cliente da fila 1
             if (len(self.__waiting_qs[0]) > 0):
                 next_client_id = self.pop_from_waiting_queue(1)
                 service_time = self.get_service_time()
@@ -681,6 +714,9 @@ class Simulator3:
                 self.insert_event(DEPARTURE, 1,
                                   self.__current_timestamp + service_time,
                                   next_client_id)
+            
+            #fila 2 não está vazia
+            #inicia serviço do primeiro cliente da fila 2
             elif (len(self.__waiting_qs[1]) > 0):
                 next_client_id = self.pop_from_waiting_queue(2)
                 service_time = self.get_service_time()
@@ -689,6 +725,7 @@ class Simulator3:
                                   self.__current_timestamp + service_time,
                                   next_client_id)
 
+            #remove cliente do sistema
             self.remove_client_from_system(event_client)
 
             #coleta métricas das filas
@@ -728,3 +765,5 @@ class Simulator3:
             self.plot_metrics_per_round_evolution()
 
         self.save_simulation_metrics_file()
+
+        self.save_execution_parameters_config()

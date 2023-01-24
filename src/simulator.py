@@ -90,8 +90,8 @@ class Simulator:
                  samples_per_round: int = 5,
                  services_until_steady_state: int = 0,
                  seed: int = None,
-                 confidence: float = 0.95,
-                 target_precision: float = 0.05,
+                 confidence: float = None,
+                 target_precision: float = None,
                  save_metric_per_round_file: bool = True,
                  save_raw_event_log_file: bool = False,
                  plot_metrics_per_round: bool=False):
@@ -115,8 +115,9 @@ class Simulator:
         self.__arrival_process = arrival_process
         """Processos de chegada de chegada(determinística ou exponencial)."""
         if(self.__arrival_process == 'exponential'):
-            self.__arrival_rate: float = (self.__utilization_pct *
-                                        self.__service_rate)
+            # self.__arrival_rate: float = (self.__utilization_pct *
+            #                             self.__service_rate)
+            self.__arrival_rate: float = (self.__utilization_pct / 2.0)
             """Taxa de chegada(lambda)(é obtida a partir das taxas de serviço e utilização, pela formula utilization_pct = (arrival_rate/service_rate))"""
         elif(self.__arrival_process == 'deterministic'):
             self.__inter_arrival_time = inter_arrival_time
@@ -894,7 +895,7 @@ class Simulator:
         self.__current_round += 1
 
     def __handle_arrival(self, event: Event):
-        """Trata o evento do tipo EventType.ARRIVAL.\n
+        """Trata o evento do tipo EventType.ARRIVAL.
         Se não há serviço corrente, o cliente recém chegado inicia imediatamente o seu serviço(EventType.START_SERVICE_1).\n
         Se o serviço corrente é oriundo da fila de espera 1, o cliente é inserido na fila de espera 1.\n
         Caso o serviço corrente seja oriundo da fila de espera 2, o serviço desse cliente é interrompido(EventType.HALT_SERVICE_2), 

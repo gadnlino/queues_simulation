@@ -103,7 +103,37 @@ Ao final de cada rodada, são determinados os intervalos de confiança para a m�
 
 Os cálculos usados para determinar os valores máximos e mínimos do intervalo de confiança estão no arquivo `src/utils/estimator.py`.
 
-## Teste de correção dos resultados
+## Corretude do simulador e análise dos resultados
+
+As fórmulas obtidas analiticamente:
+
+Para a fila 1:
+
+$$E[W_1] = {\rho_1 E[X_{1r}] \over {1-\rho_1}} = {\rho_1 \over {({1-\rho_1}) \mu}}$$
+
+$$E[Nq_1] = {\lambda E[W_1]} = {\lambda \rho_1 \over {({1-\rho_1}) \mu}}$$
+
+$$E[T_1] = {E[W_1] + E[X_1]} = {E[W_1] + E[X]} = {{\rho_1 \over {({1-\rho_1}) \mu}} + {1 \over \mu}}$$
+
+$$E[N_1] = {\lambda E[T_1]} = {\lambda ({{\rho_1 \over {({1-\rho_1}) \mu}} + {1 \over \mu}})}$$
+
+$$Var[W_1] = ??$$
+
+Para a fila 2:
+
+$$E[T_2] = {E[T] - E[T_1]}$$
+
+$$E[W_2] = E[T_2] - E[X_2] = E[T_2] - E[X] = E[X_2] - {1 \over \mu}$$
+
+$$E[N_2] = {\lambda E[T_2]} = {\lambda (E[T] - E[T_1])}$$
+
+$$E[Nq_2] = \lambda E[W_2] = \lambda (E[T_2] - E[X_2]) = \lambda (E[T_2] - {1 \over \mu})$$
+
+$$Var[W_2] = ??$$
+
+Com
+
+$$E[T] = {{E[U] + E[X_1] + E[X_2]} \over {1 - \rho}} = {{{\rho {1 \over \mu}} + (1 - \rho)(E[X_1] + E[X_2])} \over {({1-\rho_1})({1- \rho})}}$$
 
 Conforme indicado na página 111 da apostila, o cenário pode ser caracterizado por um sistema de filas HOL em que a fila 1 tem prioridade e interrompe com continuidade os serviços a fila 2. Só há entradas exógenas na primeira fila, e ao final do primeiro serviço $$X_1$$, os clientes seguem para a segunda fila e recebem o serviço $$X_2$$, de modo que o serviço total é $$X = {X_1 + X_2}$$.
 

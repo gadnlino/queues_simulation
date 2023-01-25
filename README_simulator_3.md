@@ -238,6 +238,10 @@ Os valores abaixo mostram a quantidade de rodadas até que todas as métricas co
 
     Não pude utilizar um sistema de cores a cada **chegada**, como indicado nos materiais de aula. Na minha implementação, caso considerasse somente as chegadas, as métricas da segunda fila(W2 e X2) poderiam não ser calculadas para o número desejado de clientes, pois os eventos da fila 2 são resolvidos por último. Isso criou cenários em que o programa do simulador ficou execução indefinidamente(o caso da fila D/D/1 mencionado anteriormente, por exemplo). Perante isso, determinei que a rodada avançaria sempre que k clientes tivessem a sua **partida** do sistema.
 
+- Estimador do número de pessoas na fila de espera
+
+    Porque só funciona com o cálculo área x tempo? Tentei realizar somente contagens, mas o resultado médio ficava discrepante com o valor analítico.
+
 ### Pendências
 - É possível melhorar a análise do simulador para cenários determinísticos, ao aceitar uma lista de instantes de chegada, por exemplo. Isso facilitaria a depuração do simulador ao gerar arquivos de logs menores com a lista dos eventos do sistema.
 

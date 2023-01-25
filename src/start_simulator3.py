@@ -9,7 +9,7 @@ if (__name__ == "__main__"):
         #arrival_process= 'deterministic',
         #inter_arrival_time=1.0,
         arrival_process='exponential',
-        utilization_pct=0.4,
+        utilization_pct=0.9,
         service_rate=1.0,
         #service_time = 1.0,
         number_of_rounds=3300,

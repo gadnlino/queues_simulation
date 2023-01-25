@@ -4,11 +4,14 @@ import csv
 import os
 from datetime import datetime
 from models.metric_type import MetricType
-from utils.estimator import Estimator
+from utils.area_estimator import AreaEstimator
+from utils.incremental_estimator import IncrementalEstimator
 import pandas as pd
 import matplotlib.pyplot as plt
 import inspect
 import json
+
+from utils.pmf_estimator import PMFEstimator
 
 
 #tipos de eventos
@@ -91,7 +94,7 @@ class Simulator3:
         """Instantes de chegada ao sistema pré-definidos. Utilizados para depuração do simulador."""
 
         self.__metric_estimators_current_round = {
-            str(x): Estimator()
+            str(x): IncrementalEstimator()
             for x in METRIC_TYPES
         }
         """Métricas da rodada atual."""
@@ -102,17 +105,28 @@ class Simulator3:
         É usado para gerar um arquivo csv com esses dados ao final da simulação."""
 
         self.__metric_estimators_simulation = {
-            str(x): Estimator()
+            str(x): IncrementalEstimator()
             for x in MEAN_VAR_COLUMNS
         }
         """Estimadores para métricas alvo da simulação.
         Serão incrementados ao final de cada rodada."""
+
+        #calculando o número de pessoas na fila de espera utilizando o cálculo de área x tempo
+        # self.__metric_estimators_simulation[f'{str(MetricType.NQ1)}{MEAN_SUFFIX}'] = AreaEstimator()
+        # self.__metric_estimators_simulation[f'{str(MetricType.NQ2)}{MEAN_SUFFIX}'] = AreaEstimator()
+
+        # self.__metric_estimators_simulation[f'{str(MetricType.NQ1)}{VARIANCE_SUFFIX}'] = AreaEstimator()
+        # self.__metric_estimators_simulation[f'{str(MetricType.NQ2)}{VARIANCE_SUFFIX}'] = AreaEstimator()
 
         self.__seed = seed
         """Seed para geração de variáveis aleatórias da simulação."""
 
         if (seed != None):
             random.seed(self.__seed)
+
+        self.__last_event = {
+            'event_timestamp': 0.0
+        }
 
         self.__event_log = []
         """Log de eventos(para depuração posterior)."""
@@ -741,6 +755,9 @@ class Simulator3:
             for t in self.__predefined_system_arrival_times:
                 self.schedule_new_system_arrival(t)
 
+        nq1_mean_est = AreaEstimator()
+        nq1_var_est = PMFEstimator()
+
         while (len(self.__event_q) > 0):
             event = self.__event_q.pop(0)
 
@@ -749,11 +766,21 @@ class Simulator3:
 
             self.__current_timestamp = event['event_timestamp']
 
+            nq1 = len(self.__waiting_qs[0])
+
+            nq1_mean_est.add_sample(nq1, self.__current_timestamp - self.__last_event['event_timestamp'])
+            nq1_var_est.add_sample(nq1, self.__current_timestamp - self.__last_event['event_timestamp'])
+
             #self.debug_print(event, self.__current_service)
 
             self.handle_event(event)
 
+            self.__last_event = event
+
         os.mkdir(self.__results_folder)
+
+        print('nq1_mean_est', nq1_mean_est.mean())
+        print('nq1_var_est', nq1_var_est.variance())
 
         if (self.__opt_save_raw_event_log_file):
             self.save_event_logs_raw_file()

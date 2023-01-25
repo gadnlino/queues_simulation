@@ -2,7 +2,7 @@ import math
 from scipy import stats
 
 #https://www.embeddedrelated.com/showarticle/785.php
-class Estimator:
+class IncrementalEstimator:
     def __init__(self) -> None:
         self.clear()
     

@@ -19,6 +19,7 @@ if (__name__ == "__main__"):
         confidence=0.95,
         seed=0,
         save_raw_event_log_file=False,
-        plot_metrics_per_round=False)
+        save_metric_per_round_file = False,
+        plot_metrics_per_round=True)
 
     simulator.run()

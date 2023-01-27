@@ -11,29 +11,31 @@ import matplotlib.pyplot as plt
 import inspect
 import json
 
-from utils.pmf_estimator import PMFEstimator
-
-
 #tipos de eventos
 ARRIVAL = 'ARRIVAL'
 DEPARTURE = 'DEPARTURE'
 
 #partidas são processadas primeiro do que as chegadas às filas
-EVENT_PRIORITY = {DEPARTURE: 0, ARRIVAL: 1}
+EVENT_PRIORITY = { DEPARTURE: 0, ARRIVAL: 1 }
 
-#tipos de métricas
-METRIC_TYPES = [
-    MetricType.W1, MetricType.W2, MetricType.X1, MetricType.X2, MetricType.T1,
-    MetricType.T2, MetricType.NQ1, MetricType.NQ2, MetricType.N1, MetricType.N2
+#métricas relacionadas aos clientes
+CLIENT_METRICS = [
+    MetricType.W1, MetricType.W2, MetricType.X1, MetricType.X2, MetricType.T1, MetricType.T2,
+]
+
+#métricas relacionadas às filas de espera
+QUEUE_METRICS = [
+    MetricType.NQ1, MetricType.NQ2, MetricType.N1, MetricType.N2
 ]
 
 #variáveis auxiliares para geração de métricas
 MEAN_SUFFIX = '_est_mean'
 VARIANCE_SUFFIX = '_est_var'
 MEAN_VAR_COLUMNS = sorted(
-    list(map(lambda x: f'{str(x)}{MEAN_SUFFIX}', METRIC_TYPES)) +
-    list(map(lambda x: f'{str(x)}{VARIANCE_SUFFIX}', METRIC_TYPES)))
-
+    list(map(lambda x: f'{str(x)}{MEAN_SUFFIX}', CLIENT_METRICS)) +
+    list(map(lambda x: f'{str(x)}{VARIANCE_SUFFIX}', CLIENT_METRICS)) + 
+    list(map(lambda x: f'{str(x)}{MEAN_SUFFIX}', QUEUE_METRICS)) + 
+    list(map(lambda x: f'{str(x)}{VARIANCE_SUFFIX}', QUEUE_METRICS)))
 
 class Simulator3:
 
@@ -93,11 +95,14 @@ class Simulator3:
         self.__predefined_system_arrival_times = predefined_system_arrival_times
         """Instantes de chegada ao sistema pré-definidos. Utilizados para depuração do simulador."""
 
-        self.__metric_estimators_current_round = {
-            str(x): IncrementalEstimator()
-            for x in METRIC_TYPES
-        }
+        self.__metric_estimators_current_round = {}
         """Métricas da rodada atual."""
+
+        for x in CLIENT_METRICS:
+            self.__metric_estimators_current_round[str(x)] = IncrementalEstimator()
+        
+        for x in QUEUE_METRICS:
+            self.__metric_estimators_current_round[str(x)] = AreaEstimator()
 
         self.__metrics_per_round = pd.DataFrame(columns=['round'] +
                                                 MEAN_VAR_COLUMNS)
@@ -110,13 +115,6 @@ class Simulator3:
         }
         """Estimadores para métricas alvo da simulação.
         Serão incrementados ao final de cada rodada."""
-
-        #calculando o número de pessoas na fila de espera utilizando o cálculo de área x tempo
-        # self.__metric_estimators_simulation[f'{str(MetricType.NQ1)}{MEAN_SUFFIX}'] = AreaEstimator()
-        # self.__metric_estimators_simulation[f'{str(MetricType.NQ2)}{MEAN_SUFFIX}'] = AreaEstimator()
-
-        # self.__metric_estimators_simulation[f'{str(MetricType.NQ1)}{VARIANCE_SUFFIX}'] = AreaEstimator()
-        # self.__metric_estimators_simulation[f'{str(MetricType.NQ2)}{VARIANCE_SUFFIX}'] = AreaEstimator()
 
         self.__seed = seed
         """Seed para geração de variáveis aleatórias da simulação."""
@@ -141,8 +139,14 @@ class Simulator3:
         self.__results_folder = f'./results_{str(datetime.utcnow().timestamp()).replace(".", "")}_simulator3'
         """Pasta onde os arquivos de resultado da simulação serão salvos"""
 
+        self.__execution_parameters = {}
+        """Parametros de execução do simulador. Utilizado para depuração."""
+        
+        self.record_execution_parameters()
+    
+    def record_execution_parameters(self):
         param_names = []
-        for name, parameter in inspect.signature(self.__init__).parameters.items():
+        for name, _ in inspect.signature(self.__init__).parameters.items():
             param_names.append(name)
 
         self.__execution_parameters = {}
@@ -287,20 +291,22 @@ class Simulator3:
         nq = len(self.__waiting_qs[queue_number - 1])
         n = nq
 
+        dt = self.__current_timestamp - self.__last_event['event_timestamp']
+
         if (self.__current_service != None
                 and self.__current_service['queue'] == queue_number):
             n += 1
 
         if (queue_number == 1):
             self.__metric_estimators_current_round[str(
-                MetricType.NQ1)].add_sample(nq)
+                MetricType.NQ1)].add_sample(nq, dt)
             self.__metric_estimators_current_round[str(
-                MetricType.N1)].add_sample(n)
+                MetricType.N1)].add_sample(n, dt)
         elif (queue_number == 2):
             self.__metric_estimators_current_round[str(
-                MetricType.NQ2)].add_sample(nq)
+                MetricType.NQ2)].add_sample(nq, dt)
             self.__metric_estimators_current_round[str(
-                MetricType.N2)].add_sample(n)
+                MetricType.N2)].add_sample(n, dt)
 
     def insert_in_waiting_queue(self,
                                 queue_number: int,
@@ -380,7 +386,7 @@ class Simulator3:
                     self.__metric_estimators_current_round[tp].variance())
 
     def reset_round_control_variables(self):
-        """Reseta variáveis de controle da rodada para seus valores iniciais."""
+        """Reseta variáveis de controle e estimadores da rodada para seus valores iniciais."""
 
         #self.__collected_samples_current_round = 0
 
@@ -757,9 +763,6 @@ class Simulator3:
             for t in self.__predefined_system_arrival_times:
                 self.schedule_new_system_arrival(t)
 
-        nq1_mean_est = AreaEstimator()
-        nq1_var_est = PMFEstimator()
-
         while (len(self.__event_q) > 0):
             event = self.__event_q.pop(0)
 
@@ -768,11 +771,6 @@ class Simulator3:
 
             self.__current_timestamp = event['event_timestamp']
 
-            nq1 = len(self.__waiting_qs[0])
-
-            nq1_mean_est.add_sample(nq1, self.__current_timestamp - self.__last_event['event_timestamp'])
-            nq1_var_est.add_sample(nq1, self.__current_timestamp - self.__last_event['event_timestamp'])
-
             #self.debug_print(event, self.__current_service)
 
             self.handle_event(event)
@@ -780,9 +778,6 @@ class Simulator3:
             self.__last_event = event
 
         os.mkdir(self.__results_folder)
-
-        print('nq1_mean_est', nq1_mean_est.mean())
-        print('nq1_var_est', nq1_var_est.variance())
 
         if (self.__opt_save_raw_event_log_file):
             self.save_event_logs_raw_file()

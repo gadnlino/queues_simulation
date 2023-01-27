@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from models.metric_type import MetricType
 from utils.area_estimator import AreaEstimator
+from utils.confidence_interval_calculator import chi2_dist_ci, t_dist_ci
 from utils.incremental_estimator import IncrementalEstimator
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -421,10 +422,9 @@ class Simulator3:
 
         with open(simulation_metrics_file, 'a+', newline='') as output_file:
 
-            #fieldnames = list(map(lambda x: str(x), self.__metric_estimators_simulation.keys()))
-
             fieldnames = [
-                'metric', 'lower', 'mean', 'upper', 'variance', 'precision',
+                'metric',  'mean', 'variance', 'lower_t', 'upper_t', 'precision_t',
+                'lower_chi2', 'upper_chi2', 'precision_chi2',
                 'confidence', 'rounds'
             ]
 
@@ -435,31 +435,53 @@ class Simulator3:
                 upper = ''
                 precision = ''
 
-                if (metric.endswith(MEAN_SUFFIX)):
-                    lower, upper, precision = self.__metric_estimators_simulation[
-                        metric].mean_ci(confidence=self.__confidence)
-                elif (metric.endswith(VARIANCE_SUFFIX)):
-                    lower, upper, precision = self.__metric_estimators_simulation[
-                        metric].variance_ci(confidence=self.__confidence)
+                nsamples = self.__metric_estimators_simulation[
+                        metric].nsamples()
 
-                rows.append({
-                    'metric':
-                    metric,
-                    'lower':
-                    lower,
-                    'mean':
-                    self.__metric_estimators_simulation[metric].mean(),
-                    'upper':
-                    upper,
-                    'variance':
-                    self.__metric_estimators_simulation[metric].variance(),
-                    'precision':
-                    precision,
-                    'confidence':
-                    self.__confidence,
-                    'rounds':
-                    self.__current_round
-                })
+                mean = self.__metric_estimators_simulation[
+                        metric].mean()
+                
+                variance = self.__metric_estimators_simulation[
+                        metric].variance()
+
+                results = {
+                    'metric': metric,
+                    'confidence': self.__confidence,
+                    'rounds': self.__current_round,
+                    'mean': mean,
+                    'variance': variance,
+                    'lower_t': None, 
+                    'upper_t': None, 
+                    'precision_t': None,
+                    'lower_chi2': None, 
+                    'upper_chi2': None, 
+                    'precision_chi2': None
+                }
+
+                if(metric in [f'{str(MetricType.W1)}{VARIANCE_SUFFIX}', f'{str(MetricType.W2)}{VARIANCE_SUFFIX}']):
+                    lower_t, upper_t, precision_t = t_dist_ci(mean, variance, nsamples, self.__confidence)
+                    
+                    results['lower_t'] = lower_t
+                    results['upper_t'] = upper_t
+                    results['precision_t'] = precision_t
+
+                    lower_chi2, upper_chi2, precision_chi2 = chi2_dist_ci(variance, nsamples, self.__confidence)
+
+                    results['lower_chi2'] = lower_chi2
+                    results['upper_chi2'] = upper_chi2
+                    results['precision_chi2'] = precision_chi2
+                elif (metric.endswith(MEAN_SUFFIX)):
+                    lower, upper, precision = t_dist_ci(mean, variance, nsamples, self.__confidence)
+                    results['lower_t'] = lower
+                    results['upper_t'] = upper
+                    results['precision_t'] = precision
+                elif (metric.endswith(VARIANCE_SUFFIX)):
+                    lower, upper, precision = chi2_dist_ci(variance, nsamples, self.__confidence)
+                    results['lower_chi2'] = lower
+                    results['upper_chi2'] = upper
+                    results['precision_chi2'] = precision
+
+                rows.append(results)
 
             dict_writer = csv.DictWriter(output_file, fieldnames=fieldnames)
             dict_writer.writeheader()

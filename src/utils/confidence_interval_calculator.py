@@ -13,7 +13,6 @@ def t_dist_ci(mean, variance, n, confidence):
 
     lower = mean - term
     upper = mean + term
-    #precision = 100 * percentile * (std/(mean * math.sqrt(n)))
     precision = percentile * (std/(mean * math.sqrt(n)))
 
     return lower, upper, precision

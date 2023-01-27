@@ -1,6 +1,8 @@
 import math
 from scipy import stats
 
+from utils.confidence_interval_calculator import chi2_dist_ci, t_dist_ci
+
 #https://www.embeddedrelated.com/showarticle/785.php
 class IncrementalEstimator:
     def __init__(self) -> None:
@@ -35,39 +37,36 @@ class IncrementalEstimator:
     
     #https://aegis4048.github.io/comprehensive_confidence_intervals_for_python_developers#python_ci_var
     def variance_ci(self, confidence : float):
-        alpha = 1-confidence
+        return chi2_dist_ci(self.variance(), self.__n, confidence)
+        
+        # alpha = 1-confidence
 
-        # low_ppf = stats.chi2.ppf(alpha / 2, self.__n - 1)
-        # high_ppf = stats.chi2.ppf(1 - alpha / 2, self.__n - 1)
+        # low_ppf = stats.chi2.ppf(alpha / 2, self.__n)
+        # high_ppf = stats.chi2.ppf(1 - (alpha / 2), self.__n)
 
-        # upper = (self.__n - 1) * self.variance() / low_ppf
-        # lower = (self.__n - 1) * self.variance() / high_ppf
+        # upper = (self.__n) * self.variance() / low_ppf
+        # lower = (self.__n) * self.variance() / high_ppf
 
-        low_ppf = stats.chi2.ppf(alpha / 2, self.__n)
-        high_ppf = stats.chi2.ppf(1 - alpha / 2, self.__n)
+        # precision = (high_ppf - low_ppf) / (high_ppf + low_ppf)
 
-        upper = (self.__n) * self.variance() / low_ppf
-        lower = (self.__n) * self.variance() / high_ppf
-
-        precision = (high_ppf - low_ppf) / (high_ppf + low_ppf)
-
-        return (lower, upper, precision)
+        # return (lower, upper, precision)
     
     #https://www.geeksforgeeks.org/how-to-calculate-confidence-intervals-in-python/
     def mean_ci(self, confidence: float):
-        std = self.std()
-        mean = self.mean()
+        return t_dist_ci(self.mean(), self.std(), self.__n, confidence)
 
-        #percentil da distribuição t com n graus de liberdade
-        percentile = stats.t(df=self.__n).ppf(confidence)
+        # alpha = 1-confidence
 
-        a = (std / math.sqrt(self.__n)) * percentile
+        # #percentil da distribuição t com n-1 graus de liberdade
+        # percentile = stats.t(df=self.__n-1).ppf(1 - (alpha/2))
 
-        precision = a / mean
-        upper_limit = mean + a
-        lower_limit = mean - a
+        # term = percentile * (std / math.sqrt(self.__n))
 
-        return (lower_limit, upper_limit, precision)
+        # lower = mean - term
+        # upper = mean + term
+        # precision = 100 * percentile * (std/(mean * math.sqrt(self.__n)))
+
+        # return (lower, upper, precision)
 
     def __str__(self):
         return str({

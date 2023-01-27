@@ -127,6 +127,8 @@ class Simulator3:
         self.__last_event = {
             'event_timestamp': 0.0
         }
+        """Último evento processado pelo simulador.
+        Utilizado para o cálculo do número de clientes em fila."""
 
         self.__event_log = []
         """Log de eventos(para depuração posterior)."""

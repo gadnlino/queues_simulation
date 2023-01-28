@@ -162,6 +162,7 @@ class Simulator3:
         # now = datetime.now()
         # print(now.strftime("%d/%m/%Y, %H:%M:%S"), message)
         print(message)
+        pass
 
     def save_event_logs_raw_file(self):
         """Salva o log de eventos em um arquivo .csv."""
@@ -246,12 +247,12 @@ class Simulator3:
 
         #coleta métricas relacionadas ao tempo de espera
         if (queue == 1):
-            last_event = self.get_last_event(client, ARRIVAL, 1)
+            last_event = self.get_last_event_for_client(client, ARRIVAL, 1)
             wait_time = self.__current_timestamp - last_event['event_timestamp']
             self.__clients_in_system[client]['metrics'][str(
                 MetricType.W1)] += wait_time
         elif (queue == 2 and self.__interrupted_service == None):
-            last_event = self.get_last_event(client, ARRIVAL, 2)
+            last_event = self.get_last_event_for_client(client, ARRIVAL, 2)
             wait_time = self.__current_timestamp - last_event['event_timestamp']
             self.__clients_in_system[client]['metrics'][str(
                 MetricType.W2)] += wait_time
@@ -290,7 +291,9 @@ class Simulator3:
 
     def collect_queue_size_metrics(self, queue_number: int):
         nq = len(self.__waiting_qs[queue_number - 1])
-        n = nq
+        n = len(self.__waiting_qs[queue_number - 1])
+
+        #self.debug_print(f'queue = {queue_number}, nq = {nq}, service = {self.__current_service}')
 
         dt = self.__current_timestamp - self.__last_event['event_timestamp']
 
@@ -539,7 +542,7 @@ class Simulator3:
 
         self.debug_print('Metric plots saved.')
 
-    def get_last_event(self, client: int, event_type: str, event_queue: int):
+    def get_last_event_for_client(self, client: int, event_type: str, event_queue: int):
         """Obtém o último evento do tipo espeficificado para um cliente.
 
         Parameters

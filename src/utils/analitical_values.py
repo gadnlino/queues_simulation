@@ -20,12 +20,19 @@ def E_W1(rho, mu):
     rho_1 = lbd / mu
     return (rho_1/(1-rho_1))*(1/mu)
 
+# def Var_W1(rho, mu):
+#     lbd = get_lambda(rho)
+
+#     rho_1 = lbd / mu
+
+#     return ((rho_1/(1-rho_1))**2) * (1/(lbd**2))
+
 def Var_W1(rho, mu):
     lbd = get_lambda(rho)
 
     rho_1 = lbd / mu
 
-    return ((rho_1/(1-rho_1))**2) * (1/(lbd**2))
+    return (rho_1/(1-rho_1)) * ((rho_1/(1-rho_1)) + 2)
 
 def E_NQ1(rho, mu):
     lbd = get_lambda(rho)

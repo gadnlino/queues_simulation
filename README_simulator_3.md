@@ -16,11 +16,11 @@ O ponto inicial é o arquivo `main.py`, onde é criado uma instância do o simul
 
 A execução do simulador é da seguinte forma:
 
-A princípio é gerado um evento inicial de chegada de um cliente na fila 1(evento ARRIVAL para a fila 1). Em seguida o programa permanece em loop, tratando os eventos da lista principal de eventos e realizando coletas de amostras das estatísticas para cada cliente(tempo de espera, tempo de serviço, tempo total), e também relativo as filas(número de cliente da fila e na fila de espera). A simulação acaba quando o número de total de coletas da simulação(coletas da rodada x número de rodadas) são realizadas. 
+A princípio é gerado um evento inicial de chegada de um cliente na fila 1(evento ARRIVAL para a fila 1). Em seguida o programa permanece em loop, tratando a lista principal de eventos e realizando coletas de amostras das estatísticas para cada cliente(tempo de espera, tempo de serviço, tempo total), e também relativo as filas(número de cliente da fila e na fila de espera). A simulação acaba quando o número de total de coletas da simulação(coletas da rodada x número de rodadas) são realizadas.
 
-Ao final da simulação, há a opção de gerar arquivos csv com as métricas a cada rodada e gráficos com a evolução desses valores. Os arquivos são salvos na pasta de resultados da simulação('results_{timestamp}/').
+Ao final da simulação, são gerados alguns arquivos para a análise do simulador e das métricas. Os arquivos serão descritos mais adiante na seção **Arquivos da simulação**.
 
-Os eventos são representados pela tupla (event_type, event_queue), e podem ser dos 4 tipos a seguir:
+Os evento gerados são representados pela tupla (event_type, event_queue), e podem 4 configurações:
 
 - `(ARRIVAL, 1)`: é a chegada de um novo cliente à fila 1. Caso o sistema se encontre totalmente ocioso, o cliente recém chegado inicia imediatamente o serviço. Caso haja um cliente oriundo da fila 2 em serviço, esse tem o serviço interrompido, e o cliente recém chegado na fila 1 inicia o seu serviço imediatamente. Caso haja cliente oriundos da fila 1 em serviço ou na fila de espera, o cliente recém chegado vai para a fila de espera. Após esse tratamento, caso a simulação ainda não tenha terminado, é programado um novo evento para a próxima chegada de um cliente à fila 1.
 
@@ -30,7 +30,7 @@ Os eventos são representados pela tupla (event_type, event_queue), e podem ser 
 
 - `(DEPARTURE, 2)`: é a saída de um cliente do sistema após o término do seu segundo serviço. Se houverem clientes em alguma das filas de espera, esses tem o seu serviço iniciado, seguindo a ordem de prioridade das filas. O cliente é removido do sistema, e suas métricas(coletadas na entrada e saída de serviço) são utilizadas para incrementar o estimador com as métricas da rodada corrente.
 
-Caso haja uma partida e uma chegada para o exato mesmo instante, o processamento da partida do sistema é realizado previamente ao processamento da chegada.
+Caso haja uma partida e uma chegada para o exato mesmo instante em qualquer uma das filas, o processamento da partida é realizado previamente ao processamento da chegada.
 
 ### Simulador
 
@@ -78,8 +78,13 @@ Ao longo do código, são utilizadas diversas variáveis e estruturas de control
 
 - `self.__execution_parameters`: Parâmetros utilizados na execução da simulação. 
 
-### Classe Estimator
+### Estimadores
 
+Para a estimativa das métricas da simulação, foram utilizados 2 tipos de estimadores:
+
+- `IncrementalEstimator`: como o nome sugere, realiza a estimativa da média e da variância do parametro coletado utilizando o cálculo incremental. E usado para calcular o valor médio e variãncia das métricas dos clientes(tempo de espera e tempo total.)
+
+- `AreaEstimator`: usa o cálculo de área x tempo. É usado para calcular o valor esperado e variância dos parâmetros relacionados à fila(número de clientes).
 
 ### Geração de VA's
 
@@ -97,11 +102,26 @@ Para a média dos tempos em fila espera, tempo de serviço e tempo total, é cal
 
 [Médias da simulação (linhas azuis e vermelhas tracejadas)](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png)([link](https://github.com/gadnlino/queues_simulation/raw/main/images/example_mean_values.png))
 
+### Arquivos da simulação
+
+Ao final da execução, o simulador salva os arquivos para análise das métricas na pasta `results_{timestamp}_simulator3`. Estes são:
+
+- Arquivos .png(ex: `W1_est_mean_X_round.png`) com os valores médios de cada uma das métricas, a cada rodada;
+- `simulation_metrics.csv`: onde são armazenados os resultados finais(média, variância, intervalos de confiança) de cada uma das métricas.
+- `execution_parameters.json`: os parâmetros utilizados para a simulação.
+- `metric_per_round_evolution.csv`: evolução das métricas, rodada a rodada. É a representação tabular dos dados apresentados nos arquivos .png .
+- `event_log_raw.csv`: Lista com todos os eventos tratados na simulação.
+
 ## Determinação do intervalo de confiança e número de rodadas
 
-Ao final de cada rodada, são determinados os intervalos de confiança para a média e variânciia de cada métrica, a partir do estimador global(`self.__metric_estimators_simulation`). O calculo é feito iterativamente, e a simulação e encerrada somente quando não há nenhuma métrica em que a precisão está acima do `target_precision` informado para a porcentagem de confiança `confidence`.
+Ao final de cada rodada, são determinados os intervalos de confiança para a média e variância de cada métrica, a partir do estimador global(`self.__metric_estimators_simulation`). O calculo é feito iterativamente, e a simulação e encerrada somente quando não há nenhuma métrica em que a precisão está acima do `target_precision` informado para a porcentagem de confiança `confidence`.
 
 Os cálculos usados para determinar os valores máximos e mínimos do intervalo de confiança estão no arquivo `src/utils/estimator.py`.
+
+
+
+
+
 
 ## Corretude do simulador e análise dos resultados
 
@@ -117,7 +137,11 @@ $$E[T_1] = {E[W_1] + E[X_1]} = {E[W_1] + E[X]} = {{\rho_1 \over {({1-\rho_1}) \m
 
 $$E[N_1] = {\lambda E[T_1]} = {\lambda ({{\rho_1 \over {({1-\rho_1}) \mu}} + {1 \over \mu}})}$$
 
-$$Var[W_1] = Var[{{1 \over {1- \rho_1}} X}] = {({1 \over {1- \rho_1}})^2 Var[X]} = {({1 \over {1- \rho_1}})^2 ({1 \over \lambda^2})}$$
+A variância de $W_1$, extraída da página 92 da apostila:
+
+$Var[W_{1}] = {E[W_{1}^2] - (E[W_{1}])^2}$
+
+Com $E[W_1^2] = { 2(E[W_1])^2 + \frac{\lambda E[X^3]}{3(1 - \rho_1)}}$ e $E[X^3] = {\frac{d}{ds^3} {E[e^{-sX}]}}(0) = {\frac{6}{\mu^3}}$ , obtenho $Var[W_1] = {E[W_1]^2 + \frac{\lambda}{3({1-\rho_1})} \frac{6}{\mu^3}}$:
 
 Para a fila 2:
 
@@ -129,8 +153,6 @@ $$E[N_2] = {\lambda E[T_2]} = {\lambda (E[T] - E[T_1])}$$
 
 $$E[Nq_2] = \lambda E[W_2] = \lambda (E[T_2] - E[X_2]) = \lambda (E[T_2] - {1 \over \mu})$$
 
-$$Var[W_2] = ??$$
-
 Com
 
 $$E[T] = {{E[U] + E[X_1] + E[X_2]} \over {1 - \rho}} = {{{\rho {1 \over \mu}} + (1 - \rho)(E[X_1] + E[X_2])} \over {({1-\rho_1})({1- \rho})}}$$
@@ -139,11 +161,11 @@ Tenho então os valores obtidos analiticamente:
 
 | rho 	| mu 	| E_W1                	| Var_W1             	| E_NQ1                	| E_T1               	| E_N1                	| E_W2                	| E_NQ2               	| E_T2               	| E_N2                	|
 |-----	|----	|---------------------	|--------------------	|----------------------	|--------------------	|---------------------	|---------------------	|---------------------	|--------------------	|---------------------	|
-| 0.2 	| 1  	| 0.11111111111111112 	| 1.2345679012345678 	| 0.011111111111111113 	| 1.1111111111111112 	| 0.11111111111111112 	| 0.38888888888888884 	| 0.03888888888888889 	| 1.3888888888888888 	| 0.1388888888888889  	|
-| 0.4 	| 1  	| 0.25                	| 1.5624999999999998 	| 0.05                 	| 1.25               	| 0.25                	| 1.0833333333333335  	| 0.2166666666666667  	| 2.0833333333333335 	| 0.41666666666666674 	|
-| 0.6 	| 1  	| 0.4285714285714286  	| 2.0408163265306127 	| 0.1285714285714286   	| 1.4285714285714286 	| 0.42857142857142855 	| 2.571428571428571   	| 0.7714285714285714  	| 3.571428571428571  	| 1.0714285714285714  	|
-| 0.8 	| 1  	| 0.6666666666666667  	| 2.777777777777778  	| 0.2666666666666667   	| 1.6666666666666667 	| 0.6666666666666667  	| 7.333333333333336   	| 2.9333333333333345  	| 8.333333333333336  	| 3.3333333333333344  	|
-| 0.9 	| 1  	| 0.8181818181818181  	| 3.3057851239669414 	| 0.36818181818181817  	| 1.8181818181818181 	| 0.8181818181818181  	| 17.181818181818183  	| 7.731818181818182   	| 18.181818181818183 	| 8.181818181818183   	|
+| 0.2 	| 1  	| 0.11111111111111112 	| 0.2345679012345679 	| 0.011111111111111113 	| 1.1111111111111112 	| 0.11111111111111112 	| 0.38888888888888884 	| 0.03888888888888889 	| 1.3888888888888888 	| 0.1388888888888889  	|
+| 0.4 	| 1  	| 0.25                	| 0.5625             	| 0.05                 	| 1.25               	| 0.25                	| 1.0833333333333335  	| 0.2166666666666667  	| 2.0833333333333335 	| 0.41666666666666674 	|
+| 0.6 	| 1  	| 0.4285714285714286  	| 1.0408163265306123 	| 0.1285714285714286   	| 1.4285714285714286 	| 0.42857142857142855 	| 2.571428571428571   	| 0.7714285714285714  	| 3.571428571428571  	| 1.0714285714285714  	|
+| 0.8 	| 1  	| 0.6666666666666667  	| 1.7777777777777781 	| 0.2666666666666667   	| 1.6666666666666667 	| 0.6666666666666667  	| 7.333333333333336   	| 2.9333333333333345  	| 8.333333333333336  	| 3.3333333333333344  	|
+| 0.9 	| 1  	| 0.8181818181818181  	| 2.3057851239669422 	| 0.36818181818181817  	| 1.8181818181818181 	| 0.8181818181818181  	| 17.181818181818183  	| 7.731818181818182   	| 18.181818181818183 	| 8.181818181818183   	|
 
 Conforme indicado na página 111 da apostila, o cenário pode ser caracterizado por um sistema de filas HOL em que a fila 1 tem prioridade e interrompe com continuidade os serviços a fila 2. Só há entradas exógenas na primeira fila, e ao final do primeiro serviço $$X_1$$, os clientes seguem para a segunda fila e recebem o serviço $$X_2$$, de modo que o serviço total é $$X = {X_1 + X_2}$$.
 

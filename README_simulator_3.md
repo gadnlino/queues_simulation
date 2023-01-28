@@ -4,10 +4,6 @@
 
 ## Introdução
 
-### Objetivo
-
-O objetivo deste relatório é analisar o cenário descrito para o trabalho, e realizar comparações entre os valores analíticos lá apresentados e os obtidos nas simulações detalhadas a seguir.
-
 ### Visão geral
 
 A implementação foi realizada em Python 3. As instruções para a execução do simulador estão ne seção **Instruções para execução do simulador**.
@@ -112,123 +108,17 @@ Ao final da execução, o simulador salva os arquivos para análise das métrica
 - `metric_per_round_evolution.csv`: evolução das métricas, rodada a rodada. É a representação tabular dos dados apresentados nos arquivos .png .
 - `event_log_raw.csv`: Lista com todos os eventos tratados na simulação.
 
-## Determinação do intervalo de confiança e número de rodadas
+## Obtenção dos melhores parâmetros de simulação
+
+### Número de amostras por rodada
+
+### Número de rodadas
 
 Ao final de cada rodada, são determinados os intervalos de confiança para a média e variância de cada métrica, a partir do estimador global(`self.__metric_estimators_simulation`). O calculo é feito iterativamente, e a simulação e encerrada somente quando não há nenhuma métrica em que a precisão está acima do `target_precision` informado para a porcentagem de confiança `confidence`.
 
 Os cálculos usados para determinar os valores máximos e mínimos do intervalo de confiança estão no arquivo `src/utils/estimator.py`.
 
-
-
-
-
-
-## Corretude do simulador e análise dos resultados
-
-As fórmulas obtidas analiticamente:
-
-Para a fila 1:
-
-$$E[W_1] = {\rho_1 E[X_{1r}] \over {1-\rho_1}} = {\rho_1 \over {({1-\rho_1}) \mu}}$$
-
-$$E[Nq_1] = {\lambda E[W_1]} = {\lambda \rho_1 \over {({1-\rho_1}) \mu}}$$
-
-$$E[T_1] = {E[W_1] + E[X_1]} = {E[W_1] + E[X]} = {{\rho_1 \over {({1-\rho_1}) \mu}} + {1 \over \mu}}$$
-
-$$E[N_1] = {\lambda E[T_1]} = {\lambda ({{\rho_1 \over {({1-\rho_1}) \mu}} + {1 \over \mu}})}$$
-
-A variância de $W_1$, extraída da página 92 da apostila:
-
-$Var[W_{1}] = {E[W_{1}^2] - (E[W_{1}])^2}$
-
-Com $E[W_1^2] = { 2(E[W_1])^2 + \frac{\lambda E[X^3]}{3(1 - \rho_1)}}$ e $E[X^3] = {\frac{d}{ds^3} {E[e^{-sX}]}}(0) = {\frac{6}{\mu^3}}$ , obtenho $Var[W_1] = {E[W_1]^2 + \frac{\lambda}{3({1-\rho_1})} \frac{6}{\mu^3}}$:
-
-Para a fila 2:
-
-$$E[T_2] = {E[T] - E[T_1]}$$
-
-$$E[W_2] = E[T_2] - E[X_2] = E[T_2] - E[X] = E[X_2] - {1 \over \mu}$$
-
-$$E[N_2] = {\lambda E[T_2]} = {\lambda (E[T] - E[T_1])}$$
-
-$$E[Nq_2] = \lambda E[W_2] = \lambda (E[T_2] - E[X_2]) = \lambda (E[T_2] - {1 \over \mu})$$
-
-Com
-
-$$E[T] = {{E[U] + E[X_1] + E[X_2]} \over {1 - \rho}} = {{{\rho {1 \over \mu}} + (1 - \rho)(E[X_1] + E[X_2])} \over {({1-\rho_1})({1- \rho})}}$$
-
-Tenho então os valores obtidos analiticamente:
-
-| rho 	| mu 	| E_W1                	| Var_W1             	| E_NQ1                	| E_T1               	| E_N1                	| E_W2                	| E_NQ2               	| E_T2               	| E_N2                	|
-|-----	|----	|---------------------	|--------------------	|----------------------	|--------------------	|---------------------	|---------------------	|---------------------	|--------------------	|---------------------	|
-| 0.2 	| 1  	| 0.11111111111111112 	| 0.2345679012345679 	| 0.011111111111111113 	| 1.1111111111111112 	| 0.11111111111111112 	| 0.38888888888888884 	| 0.03888888888888889 	| 1.3888888888888888 	| 0.1388888888888889  	|
-| 0.4 	| 1  	| 0.25                	| 0.5625             	| 0.05                 	| 1.25               	| 0.25                	| 1.0833333333333335  	| 0.2166666666666667  	| 2.0833333333333335 	| 0.41666666666666674 	|
-| 0.6 	| 1  	| 0.4285714285714286  	| 1.0408163265306123 	| 0.1285714285714286   	| 1.4285714285714286 	| 0.42857142857142855 	| 2.571428571428571   	| 0.7714285714285714  	| 3.571428571428571  	| 1.0714285714285714  	|
-| 0.8 	| 1  	| 0.6666666666666667  	| 1.7777777777777781 	| 0.2666666666666667   	| 1.6666666666666667 	| 0.6666666666666667  	| 7.333333333333336   	| 2.9333333333333345  	| 8.333333333333336  	| 3.3333333333333344  	|
-| 0.9 	| 1  	| 0.8181818181818181  	| 2.3057851239669422 	| 0.36818181818181817  	| 1.8181818181818181 	| 0.8181818181818181  	| 17.181818181818183  	| 7.731818181818182   	| 18.181818181818183 	| 8.181818181818183   	|
-
-Conforme indicado na página 111 da apostila, o cenário pode ser caracterizado por um sistema de filas HOL em que a fila 1 tem prioridade e interrompe com continuidade os serviços a fila 2. Só há entradas exógenas na primeira fila, e ao final do primeiro serviço $$X_1$$, os clientes seguem para a segunda fila e recebem o serviço $$X_2$$, de modo que o serviço total é $$X = {X_1 + X_2}$$.
-
-Nesse cenário, é mais prático analisar as duas filas de maneira separada.
-
-### Fila 1
-
-A fila 1 não sofre interrupção, então:
-
-$$E[W_1] = {\rho_1 E[X_{1r}] \over {1-\rho_1}}$$
-
-Como os tempos de serviço seguem uma distribuição exponencial,
-
-$$E[X_{1r}] = E[X_1] = {1 \over \mu }$$
-
-Dessa forma:
-
-$$E[W_1] = {\rho_1 \over {({1-\rho_1}) \mu}}$$
-
-
-Os resultados analíticos, para as diferentes taxas de utilização(com $$\mu = 1$$):
-
-| $$\rho_1$$ 	| $$E[W_1]$$  	|
-|------------	|------------	|
-| 0,2        	| 0,25       	|
-| 0,4        	| 0,66666... 	|
-| 0,6        	| 1,5        	|
-| 0,8        	| 4          	|
-| 0,9        	| 9          	|
-
-Ao rodar a simulação, com processos de chegadas e serviços exponenciais(fila 1 se comportando como uma fila M/M/1):
-
-Com precisão de 5%:
-
-| metric      	| lower               	| mean                	| upper              	| variance            	| precision            	| confidence 	| rounds 	|
-|-------------	|---------------------	|---------------------	|--------------------	|---------------------	|----------------------	|------------	|--------	|
-| W1_est_mean 	| 0.24417837568491232 	| 0.24891135818876323 	| 0.2536443406926141 	| 0.02541166057338099 	| 0.019014730939926075 	| 0.95       	| 3071   	|
-
-Com 20000 rodadas:
-
-| metric      	| lower              	| mean                	| upper               	| variance             	| precision            	| confidence 	| rounds 	|
-|-------------	|--------------------	|---------------------	|---------------------	|----------------------	|----------------------	|------------	|--------	|
-| W1_est_mean 	| 0.2498590794078621 	| 0.25179153846424845 	| 0.25372399752063485 	| 0.027602972390038418 	| 0.007674837161617935 	| 0.95       	| 20001  	|
-
-Com 50000 rodadas:
-
-| metric      	| lower               	| mean               	| upper              	| variance             	| precision            	| confidence 	| rounds 	|
-|-------------	|---------------------	|--------------------	|--------------------	|----------------------	|----------------------	|------------	|--------	|
-| W1_est_mean 	| 0.24913344201438836 	| 0.2503461970724465 	| 0.2515589521305046 	| 0.027179758079981704 	| 0.004844311885860886 	| 0.95       	| 50001  	|
-
-Garantidamente pela Lei Forte dos Grandes Números, se o número de rodadas da simulação for infinitamente grande, o resultado convergirá para o valor calculado analiticamente.
-
-Para $$E[W_2]$$:
-
-Foram realizadas execuções com o simulador configurado para uma fila D/D/1. Em um cenário que há infinitas chegadas ao sistema, é necessário que cada cliente tenha os dois serviços executados e deixe o sistema antes que um novo cliente chegue ao sistema. Caso contrário, o simulador permanece em execução eternamente. Nesse cenário, os clientes teriam tempo de espera em fila nulo. Isso foi atestado ao rodar com os parâmetros abaixo:
-
-| tempo entre chegadas 	| tempo de serviço 	| rodadas 	| amostras / rodada 	| fase transiente 	| termina execução? 	|
-|-----------------------	|-----------------	|------------------	|-------------------	|-----------------------------	|-------------------	|
-| 1.0                   	| 2.1             	| 20               	| 50                	| 10000                       	| não               	|
-| 2.1                   	| 1.0             	| 20               	| 50                	| 10000                       	| sim               	|
-| 2.0                   	| 1.0             	| 20               	| 50                	| 10000                       	| sim               	|
-
-## Determinando a fase transiente
+### Determinando a fase transiente
 
 Conforme o enunciado da tarefa, a equação de equilibrio para esse sistema é $$2\lambda = {\mu}$$
 
@@ -251,6 +141,54 @@ Com relação ao número ótimo de amostras por rodada, após algumas simulaçõ
 [k = 200](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_200.csv)([link](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_200.csv))
 
 [k = 1000](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_1000.csv)([link](https://github.com/gadnlino/queues_simulation/raw/main/files/metric_per_round_k_1000.csv))
+
+## Corretude do simulador e análise dos resultados
+
+### Cenários determinísticos
+
+### Obtenção dos valores analíticos
+
+Para realizar a comparação com os valores obtidos no simulador, primeiro deduziu-se os valores analíticos para as variáveis interessadas:
+
+Da fila 1:
+
+$E[W_1] = {\rho_1 E[X_{1r}] \over {1-\rho_1}} = {\rho_1 \over {({1-\rho_1}) \mu}}$
+
+$E[Nq_1] = {\lambda E[W_1]} = {\lambda \rho_1 \over {({1-\rho_1}) \mu}}$
+
+$E[T_1] = {E[W_1] + E[X_1]} = {E[W_1] + E[X]} = {{\rho_1 \over {({1-\rho_1}) \mu}} + {1 \over \mu}}$
+
+$E[N_1] = {\lambda E[T_1]} = {\lambda ({{\rho_1 \over {({1-\rho_1}) \mu}} + {1 \over \mu}})}$
+
+A variância de $W_1$(extraída da página 92 da apostila):
+
+$Var[W_{1}] = {E[W_{1}^2] - (E[W_{1}])^2}$
+
+Com $E[W_1^2] = { 2(E[W_1])^2 + \frac{\lambda E[X^3]}{3(1 - \rho_1)}}$ e $E[X^3] = - ({{({-1})^3 \frac{d}{ds^3} {E[e^{-sX}]}}(0)}) = {\frac{6}{\mu^3}}$ , obtenho $Var[W_1] = {E[W_1]^2 + \frac{\lambda}{3({1-\rho_1})} \frac{6}{\mu^3}}$:
+
+Da fila 2(fórmulas obtidas a partir do slide da aula 17):
+
+$E[T] = {{E[U] + E[X_1] + E[X_2]} \over {1 - \rho}} = {{{\rho {1 \over \mu}} + (1 - \rho)(E[X_1] + E[X_2])} \over {({1-\rho_1})({1- \rho})}}$
+
+$E[T_2] = {E[T] - E[T_1]}$
+
+$E[W_2] = E[T_2] - E[X_2] = E[T_2] - E[X] = E[X_2] - {1 \over \mu}$
+
+$E[N_2] = {\lambda E[T_2]} = {\lambda (E[T] - E[T_1])}$
+
+$E[Nq_2] = \lambda E[W_2] = \lambda (E[T_2] - E[X_2]) = \lambda (E[T_2] - {1 \over \mu})$
+
+Tenho então os valores obtidos analiticamente:
+
+| rho 	| mu 	| E_W1                	| Var_W1             	| E_NQ1                	| E_T1               	| E_N1                	| E_W2                	| E_NQ2               	| E_T2               	| E_N2                	|
+|-----	|----	|---------------------	|--------------------	|----------------------	|--------------------	|---------------------	|---------------------	|---------------------	|--------------------	|---------------------	|
+| 0.2 	| 1  	| 0.11111111111111112 	| 0.2345679012345679 	| 0.011111111111111113 	| 1.1111111111111112 	| 0.11111111111111112 	| 0.38888888888888884 	| 0.03888888888888889 	| 1.3888888888888888 	| 0.1388888888888889  	|
+| 0.4 	| 1  	| 0.25                	| 0.5625             	| 0.05                 	| 1.25               	| 0.25                	| 1.0833333333333335  	| 0.2166666666666667  	| 2.0833333333333335 	| 0.41666666666666674 	|
+| 0.6 	| 1  	| 0.4285714285714286  	| 1.0408163265306123 	| 0.1285714285714286   	| 1.4285714285714286 	| 0.42857142857142855 	| 2.571428571428571   	| 0.7714285714285714  	| 3.571428571428571  	| 1.0714285714285714  	|
+| 0.8 	| 1  	| 0.6666666666666667  	| 1.7777777777777781 	| 0.2666666666666667   	| 1.6666666666666667 	| 0.6666666666666667  	| 7.333333333333336   	| 2.9333333333333345  	| 8.333333333333336  	| 3.3333333333333344  	|
+| 0.9 	| 1  	| 0.8181818181818181  	| 2.3057851239669422 	| 0.36818181818181817  	| 1.8181818181818181 	| 0.8181818181818181  	| 17.181818181818183  	| 7.731818181818182   	| 18.181818181818183 	| 8.181818181818183   	|
+
+O arquivo com as funções para geração dos valores acima é o `utils/analitical_values.py`.
 
 ## Análise dos resultados
 
@@ -294,20 +232,6 @@ Os valores abaixo mostram a quantidade de rodadas até que todas as métricas co
 | 15    | 0.9        | 1.0             | 10^7 | 3453              | 50                 | 10000                | 182650       | 154,99          |
 
 ## Conclusões
-
-### Dificuldades
-- Amostragem de métricas
-
-    Não pude utilizar um sistema de cores a cada **chegada**, como indicado nos materiais de aula. Na minha implementação, caso considerasse somente as chegadas, as métricas da segunda fila(W2 e X2) poderiam não ser calculadas para o número desejado de clientes, pois os eventos da fila 2 são resolvidos por último. Isso criou cenários em que o programa do simulador ficou execução indefinidamente(o caso da fila D/D/1 mencionado anteriormente, por exemplo). Perante isso, determinei que a rodada avançaria sempre que k clientes tivessem a sua **partida** do sistema.
-
-- Estimador do número de pessoas na fila de espera
-
-    Porque só funciona com o cálculo área x tempo? Tentei realizar somente contagens, mas o resultado médio ficava discrepante com o valor analítico.
-
-### Pendências
-- É possível melhorar a análise do simulador para cenários determinísticos, ao aceitar uma lista de instantes de chegada, por exemplo. Isso facilitaria a depuração do simulador ao gerar arquivos de logs menores com a lista dos eventos do sistema.
-
-- É necessário uma análise detalhada do simulador comparativamente com os cenários obtidos analiticamente.
 
 ## Instruções para execução do simulador
 

@@ -6,6 +6,7 @@ from datetime import datetime
 from models.metric_type import MetricType
 from utils.area_estimator import AreaEstimator
 from utils.confidence_interval_calculator import chi2_dist_ci, t_dist_ci
+from utils.data_point_estimator import DataPointEstimator
 from utils.incremental_estimator import IncrementalEstimator
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -81,6 +82,7 @@ class Simulator3:
         self.__number_of_rounds = number_of_rounds
         self.__samples_per_round = samples_per_round
         self.__arrivals_until_steady_state = arrivals_until_steady_state
+        self.__steady_state_reached = False
 
         self.__current_round = 1
         """Rodada atual do simulador."""
@@ -357,7 +359,8 @@ class Simulator3:
 
         self.__current_round += 1
 
-        self.generate_round_metrics()
+        if(self.__steady_state_reached):
+            self.generate_round_metrics()
 
         self.reset_round_control_variables()
 
@@ -583,6 +586,7 @@ class Simulator3:
         if (client not in self.__clients_in_system):
             self.__clients_in_system[client] = {
                 'events': [],
+                'color': self.__current_round,
                 'metrics': {
                     str(MetricType.W1): 0.0,
                     str(MetricType.X1): 0.0,
@@ -632,6 +636,9 @@ class Simulator3:
         self.add_client_event(event_client, event)
 
         if (event_type == ARRIVAL and event_queue == 1):
+            #coleta métricas das filas
+            self.collect_queue_size_metrics(1)
+            self.collect_queue_size_metrics(2)
 
             #fila 1 está vazia, 
             if(len(self.__waiting_qs[0]) == 0):
@@ -681,15 +688,17 @@ class Simulator3:
 
             self.__number_of_arrivals += 1
 
-            if (self.__number_of_arrivals >=
+            if(self.__steady_state_reached == False and self.__number_of_arrivals == self.__arrivals_until_steady_state):
+                self.__steady_state_reached = True
+                self.advance_round()
+            elif (self.__number_of_arrivals >=
                     self.__arrivals_until_steady_state +
                 (self.__samples_per_round * self.__current_round)):
                 self.advance_round()
-
+        elif (event_type == ARRIVAL and event_queue == 2):
             #coleta métricas das filas
             self.collect_queue_size_metrics(1)
             self.collect_queue_size_metrics(2)
-        elif (event_type == ARRIVAL and event_queue == 2):
 
             #sistema está ocioso
             #cliente recém chegado a fila 2 inicia o seu serviço e tem sua partida da fila 2 agendada
@@ -702,11 +711,11 @@ class Simulator3:
             #sistema não está ocioso, cliente vai para a fila de espera 2
             else:
                 self.insert_in_waiting_queue(2, event_client)
-
+        elif (event_type == DEPARTURE and event_queue == 1):
             #coleta métricas das filas
             self.collect_queue_size_metrics(1)
             self.collect_queue_size_metrics(2)
-        elif (event_type == DEPARTURE and event_queue == 1):
+
             self.remove_current_service()
 
             #fila 1 tem clientes em espera
@@ -746,10 +755,11 @@ class Simulator3:
             self.insert_event(ARRIVAL, 2, self.__current_timestamp,
                               event_client)
 
+        elif (event_type == DEPARTURE and event_queue == 2):
             #coleta métricas das filas
             self.collect_queue_size_metrics(1)
             self.collect_queue_size_metrics(2)
-        elif (event_type == DEPARTURE and event_queue == 2):
+
             self.remove_current_service()
 
             #fila 1 não está vazia
@@ -774,10 +784,6 @@ class Simulator3:
 
             #remove cliente do sistema
             self.remove_client_from_system(event_client)
-
-            #coleta métricas das filas
-            self.collect_queue_size_metrics(1)
-            self.collect_queue_size_metrics(2)
 
     def run(self, ):
 

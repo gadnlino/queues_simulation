@@ -1,4 +1,5 @@
 import math
+import numpy as np
 from scipy import stats
 
 def t_dist_ci(mean, variance, n, confidence):
@@ -24,7 +25,7 @@ def chi2_dist_ci(variance, n, confidence):
     higher_ppf = stats.chi2.ppf(1-(alpha / 2), n-1)
 
     lower = ((n-1)*variance)/higher_ppf
-    upper = ((n-1)*variance)/(lower_ppf)
+    upper = ((n-1)*variance)/lower_ppf
 
     precision = (higher_ppf - lower_ppf)/(higher_ppf + lower_ppf)
 
@@ -73,5 +74,11 @@ if(__name__ == '__main__'):
             break
 
         i += 1
+    
+    #data = [12, 12, 13, 13, 15, 16, 17, 22, 23, 25, 26, 27, 28, 28, 29]
+
+    #create 95% confidence interval for population mean weight
+    #print(stats.t.interval(alpha=0.95, df=len(data)-1, loc=np.mean(data), scale=stats.sem(data)) )
+    #print(stats.t.interval(confidence = 0.99,df=3300, loc=0.8375237267138028,scale=0.00038917548069624866))
 
     

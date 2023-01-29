@@ -12,9 +12,7 @@ from utils.incremental_estimator import IncrementalEstimator
 import pandas as pd
 import matplotlib.pyplot as plt
 import inspect
-import json
-
-
+import numpy as np
 
 #tipos de eventos
 ARRIVAL = 'ARRIVAL'
@@ -36,6 +34,9 @@ QUEUE_METRICS = [
 #variáveis auxiliares para geração de métricas
 MEAN_SUFFIX = '_est_mean'
 VARIANCE_SUFFIX = '_est_var'
+COVARIANCE_SUFFIX = '_cov'
+COVARIANCE_RATIO_SUFFIX = '_cov_var'
+
 MEAN_VAR_COLUMNS = sorted(
     list(map(lambda x: f'{str(x)}{MEAN_SUFFIX}', CLIENT_METRICS)) +
     list(map(lambda x: f'{str(x)}{VARIANCE_SUFFIX}', CLIENT_METRICS)) + 
@@ -51,7 +52,7 @@ class Simulator3:
                  utilization_pct: float = 0.5,
                  service_rate: float = 1.0,
                  service_time: float = None,
-                 number_of_rounds=20,
+                 number_of_rounds=3300,
                  samples_per_round=50,
                  collect_all = False,
                  arrivals_until_steady_state: int = 0,
@@ -181,6 +182,16 @@ class Simulator3:
         # #print(now.strftime("%d/%m/%Y, %H:%M:%S"), message)
         print(message)
         pass
+    
+    def calculate_covariance(self,):
+        mean_cols = list(filter(lambda x: str(x).endswith(MEAN_SUFFIX), list(self.__metrics_per_round.columns)))
+        
+        for col in mean_cols:
+            metric_name = col.replace("_est_mean", "")
+            for i in range(1, self.__number_of_rounds):
+                cov = np.cov(self.__metrics_per_round[col][0:i+1])
+                self.__metrics_per_round.loc[i, f'{metric_name}{COVARIANCE_SUFFIX}'] = cov
+                self.__metrics_per_round.loc[i, f'{metric_name}{COVARIANCE_RATIO_SUFFIX}'] = cov / self.__metrics_per_round.loc[i, f'{metric_name}{VARIANCE_SUFFIX}']
 
     def save_event_logs_raw_file(self):
         """Salva o log de eventos em um arquivo .csv."""
@@ -461,7 +472,9 @@ class Simulator3:
                 'upper_chi2', 
                 'precision_chi2',
                 'confidence', 
-                'rounds'
+                'rounds',
+                'mean_cov',
+                'mean_cov_var'
             ]
 
             rows = []
@@ -477,6 +490,8 @@ class Simulator3:
                 
                 variance = self.__metric_estimators_simulation[metric].variance()
 
+                metric_tp = metric.split('_')[0]
+
                 results = {
                     'metric': metric,
                     'confidence': self.__confidence,
@@ -489,7 +504,9 @@ class Simulator3:
                     'precision_t': None,
                     'lower_chi2': None, 
                     'upper_chi2': None, 
-                    'precision_chi2': None
+                    'precision_chi2': None,
+                    'mean_cov': np.mean(self.__metrics_per_round[f'{metric_tp}{COVARIANCE_SUFFIX}']),
+                    'mean_cov_var': np.mean(self.__metrics_per_round[f'{metric_tp}{COVARIANCE_RATIO_SUFFIX}'])
                 }
 
                 if(metric in [f'{str(MetricType.W1)}{VARIANCE_SUFFIX}', f'{str(MetricType.W2)}{VARIANCE_SUFFIX}']):
@@ -875,7 +892,8 @@ class Simulator3:
 
         self.__simulation_running = True
 
-        #while (self.__simulation_running):
+        start = datetime.utcnow().timestamp()
+
         while (len(self.__event_q) > 0):            
             event = self.__event_q.pop(0)
 
@@ -889,6 +907,12 @@ class Simulator3:
             self.handle_event(event)
 
             self.__last_event = event
+        
+        total = datetime.utcnow().timestamp() - start
+
+        self.debug_print(f'Total simulation time = {total} s')
+
+        self.calculate_covariance()
 
         os.mkdir(self.__results_folder)
 

@@ -53,6 +53,7 @@ class Simulator3:
                  service_time: float = None,
                  number_of_rounds=20,
                  samples_per_round=50,
+                 collect_all = False,
                  arrivals_until_steady_state: int = 0,
                  predefined_system_arrival_times: list[float] = None,
                  confidence: float = 0.95,
@@ -84,11 +85,18 @@ class Simulator3:
 
         self.__number_of_rounds = number_of_rounds
         self.__samples_per_round = samples_per_round
+        self.__collect_all = collect_all
         self.__arrivals_until_steady_state = arrivals_until_steady_state
-        self.__steady_state_reached = False
 
         self.__current_round = 0
         """Rodada atual do simulador."""
+
+        self.__steady_state_reached = False
+
+        if(self.__arrivals_until_steady_state == 0):
+            self.__steady_state_reached = True
+            self.__current_round = 1
+        
         self.__number_of_arrivals = 0
         """Número de chegadas ao sistema(na fila 1)."""
 
@@ -498,7 +506,9 @@ class Simulator3:
                     results['precision_chi2'] = precision_chi2
 
                     if(not (self.__service_process == 'deterministic' or self.__arrival_process == 'deterministic') and metric in self.__analytical_values.columns):
-                        results['mean_analytical'] = float(self.__analytical_values[self.__analytical_values['rho'] == self.__utilization_pct][metric])
+                        value = self.__analytical_values[self.__analytical_values['rho'] == self.__utilization_pct][metric]
+                        if(value.size > 0):
+                            results['mean_analytical'] = float(value)
                 elif (metric.endswith(MEAN_SUFFIX)):
                     lower, upper, precision = t_dist_ci(mean, variance, nsamples, self.__confidence)
                     results['lower_t'] = lower
@@ -506,7 +516,10 @@ class Simulator3:
                     results['precision_t'] = precision
 
                     if(not (self.__service_process == 'deterministic' or self.__arrival_process == 'deterministic') and metric in self.__analytical_values.columns):
-                        results['mean_analytical'] = float(self.__analytical_values[self.__analytical_values['rho'] == self.__utilization_pct][metric])
+                        value = self.__analytical_values[self.__analytical_values['rho'] == self.__utilization_pct][metric]
+
+                        if(value.size > 0):
+                            results['mean_analytical'] = float(value)
                 elif (metric.endswith(VARIANCE_SUFFIX)):
                     lower, upper, precision = chi2_dist_ci(variance, nsamples, self.__confidence)
                     results['lower_chi2'] = lower
@@ -676,13 +689,25 @@ class Simulator3:
             self.__clients_in_system[client]['metrics'].keys())
 
         #colatando amostras se o cliente for da rodada atual
-        if(self.__clients_in_system[client]['color'] == self.__current_round):
+        if(self.__collect_all or self.__clients_in_system[client]['color'] == self.__current_round):
             #adicionando amostras do cliente às amostras da rodada
             for m in client_metrics:
                 self.__metric_estimators_current_round[m].add_sample(
                     self.__clients_in_system[client]['metrics'][m])
 
         self.__clients_in_system.pop(client)
+
+    def increment_number_of_arrivals(self,):
+        self.__number_of_arrivals += 1
+
+        if(self.__steady_state_reached == False and (self.__number_of_arrivals == self.__arrivals_until_steady_state)):
+            self.__steady_state_reached = True
+            #self.advance_round()
+            self.__current_round = 1
+        elif (self.__number_of_arrivals >=
+                self.__arrivals_until_steady_state +
+            (self.__samples_per_round * self.__current_round)):
+            self.advance_round()
 
     def handle_event(self, event):
         event_type = event['event_type']
@@ -743,16 +768,7 @@ class Simulator3:
             #agenda nova chegada de cliente na fila 1
             self.schedule_new_system_arrival()
 
-            self.__number_of_arrivals += 1
-
-            if(self.__steady_state_reached == False and 
-                (self.__number_of_arrivals == self.__arrivals_until_steady_state or self.__number_of_arrivals == self.__arrivals_until_steady_state + 1)):
-                self.__steady_state_reached = True
-                self.advance_round()
-            elif (self.__number_of_arrivals >=
-                    self.__arrivals_until_steady_state +
-                (self.__samples_per_round * self.__current_round)):
-                self.advance_round()
+            self.increment_number_of_arrivals()
         elif (event_type == ARRIVAL and event_queue == 2):
             #coleta métricas das filas
             self.collect_queue_size_metrics(1)
@@ -859,7 +875,8 @@ class Simulator3:
 
         self.__simulation_running = True
 
-        while (self.__simulation_running):
+        #while (self.__simulation_running):
+        while (len(self.__event_q) > 0):            
             event = self.__event_q.pop(0)
 
             if (self.__opt_save_raw_event_log_file):

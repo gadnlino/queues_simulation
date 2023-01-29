@@ -90,6 +90,10 @@ Para gerar amostras de variáveis aleatórias exponenciais, é usado o seguinte 
 
 ### Amostragem
 
+- TODO: Descrever método batch
+- TODO: seed utilizada por toda a simulação
+- TODO: descrever conceito de cores
+
 Para as métricas referentes ao número de clientes no sistema e em cada fila espera, a coleta é realizada a cada tratamento de evento da simulação. Isso permitiu uma maior precisão para as estimativas relacionados à fila 2, que tem seus eventos associados tratados somente após os eventos da fila 1 devido à precedência de prioridade.
 
 Para a média dos tempos em fila espera, tempo de serviço e tempo total, é calculado o valor absoluto para cada um dos clientes, e, ao final da rodada, ou seja, após a partida de k clientes, calcula-se o valor médio e a variância para a rodada. Nesse momento, é incrementa-se o estimador global para a média e variância do valor médio das rodadas. No gráfico gerado ao final das rodadas, esse valor é representado por uma linha tracejada, por ex:
@@ -108,13 +112,176 @@ Ao final da execução, o simulador salva os arquivos para análise das métrica
 
 ## Corretude do simulador e análise dos resultados
 
-### Cenários determinísticos
+### Cenários controlados
 
 1) Chegadas a cada 2 segundos, serviço constante = 1 segundo:
 
-    Nesse cenário não há tempo de espera; o cliente chega ao sistema pela fila 1 e tem os seus 2 serviços realizados antes que um novo cliente chegue(e o interrompa). A variância deve ser nula para esse cenário.
+Nesse cenário, o tempo de espera para os clientes em ambas as filas é; o cliente chega ao sistema pela fila 1 e tem os seus 2 serviços realizados antes que um novo cliente chegue e o interrompa. A variância dos tempo de espera e de serviço também deve ser nula para esse cenário.
 
-    Parametros alvo: $E[W_1] = 0$, $E[W_2] = 0$, $E[T_1] = $1, $E[T_2] = 1$
+Parâmetros alvo: $E[W_1] = 0$, $Var[W_1] = 0$, $E[W_2] = 0$, $E[T_1] = E[X] = 1$, $E[T_2] = E[X] = 1$
+
+| confidence 	| arrival_process 	| inter_arrival_time 	| service_process 	| service_time 	| number_of_rounds 	| samples_per_round 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|--------------------	|-----------------	|--------------	|------------------	|-------------------	|-----------------------------	|--------	|
+| 0.95       	| deterministic   	| 2.0                	| deterministic   	| 1.0          	| 10               	| 2                 	| 0                           	| 100000 	|
+
+| metric      	| mean               	| variance            	| lower_t            	| upper_t            	| precision_t         	| lower_chi2 	| upper_chi2 	| precision_chi2     	| confidence 	|
+|-------------	|--------------------	|---------------------	|--------------------	|--------------------	|---------------------	|------------	|------------	|--------------------	|------------	|
+| T1_est_mean 	| 0.8181818181818182 	| 0.16363636363636366 	| 0.5464216398380759 	| 1.0899419965255606 	| 0.33215132908679623 	|            	|            	|                    	| 0.95       	|
+| T1_est_var  	| 0.0                	| 0.0                 	|                    	|                    	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| T2_est_mean 	| 0.8181818181818182 	| 0.16363636363636366 	| 0.5464216398380759 	| 1.0899419965255606 	| 0.33215132908679623 	|            	|            	|                    	| 0.95       	|
+| T2_est_var  	| 0.0                	| 0.0                 	|                    	|                    	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| W1_est_mean 	| 0.0                	| 0.0                 	| 0.0                	| 0.0                	| 0.0                 	|            	|            	|                    	| 0.95       	|
+| W1_est_var  	| 0.0                	| 0.0                 	| 0.0                	| 0.0                	| 0.0                 	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| W2_est_mean 	| 0.0                	| 0.0                 	| 0.0                	| 0.0                	| 0.0                 	|            	|            	|                    	| 0.95       	|
+| W2_est_var  	| 0.0                	| 0.0                 	| 0.0                	| 0.0                	| 0.0                 	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| X1_est_mean 	| 0.8181818181818182 	| 0.16363636363636366 	| 0.5464216398380759 	| 1.0899419965255606 	| 0.33215132908679623 	|            	|            	|                    	| 0.95       	|
+| X1_est_var  	| 0.0                	| 0.0                 	|                    	|                    	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| X2_est_mean 	| 0.8181818181818182 	| 0.16363636363636366 	| 0.5464216398380759 	| 1.0899419965255606 	| 0.33215132908679623 	|            	|            	|                    	| 0.95       	|
+| X2_est_var  	| 0.0                	| 0.0                 	|                    	|                    	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+
+Utilizando um número de amostras por rodada:
+
+| confidence 	| arrival_process 	| inter_arrival_time 	| service_process 	| service_time 	| number_of_rounds 	| samples_per_round 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|--------------------	|-----------------	|--------------	|------------------	|-------------------	|-----------------------------	|--------	|
+| 0.95       	| deterministic   	| 2.0                	| deterministic   	| 1.0          	| 10               	| 1000              	| 0                           	| 100000 	|
+
+| metric      	| mean               	| variance            	| lower_t            	| upper_t           	| precision_t         	| lower_chi2 	| upper_chi2 	| precision_chi2     	| confidence 	|
+|-------------	|--------------------	|---------------------	|--------------------	|-------------------	|---------------------	|------------	|------------	|--------------------	|------------	|
+| T1_est_mean 	| 0.9090909090909091 	| 0.09090909090909083 	| 0.7065328316395512 	| 1.111648986542267 	| 0.22281388519649376 	|            	|            	|                    	| 0.95       	|
+| T1_est_var  	| 0.0                	| 0.0                 	|                    	|                   	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| T2_est_mean 	| 0.9090909090909091 	| 0.09090909090909083 	| 0.7065328316395512 	| 1.111648986542267 	| 0.22281388519649376 	|            	|            	|                    	| 0.95       	|
+| T2_est_var  	| 0.0                	| 0.0                 	|                    	|                   	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| W1_est_mean 	| 0.0                	| 0.0                 	| 0.0                	| 0.0               	| 0.0                 	|            	|            	|                    	| 0.95       	|
+| W1_est_var  	| 0.0                	| 0.0                 	| 0.0                	| 0.0               	| 0.0                 	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| W2_est_mean 	| 0.0                	| 0.0                 	| 0.0                	| 0.0               	| 0.0                 	|            	|            	|                    	| 0.95       	|
+| W2_est_var  	| 0.0                	| 0.0                 	| 0.0                	| 0.0               	| 0.0                 	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| X1_est_mean 	| 0.9090909090909091 	| 0.09090909090909083 	| 0.7065328316395512 	| 1.111648986542267 	| 0.22281388519649376 	|            	|            	|                    	| 0.95       	|
+| X1_est_var  	| 0.0                	| 0.0                 	|                    	|                   	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+| X2_est_mean 	| 0.9090909090909091 	| 0.09090909090909083 	| 0.7065328316395512 	| 1.111648986542267 	| 0.22281388519649376 	|            	|            	|                    	| 0.95       	|
+| X2_est_var  	| 0.0                	| 0.0                 	|                    	|                   	|                     	| 0.0        	| 0.0        	| 0.7263419942725865 	| 0.95       	|
+
+Com um número grande de rodadas e de amostras por rodada:
+
+| confidence 	| arrival_process 	| inter_arrival_time 	| service_process 	| service_time 	| number_of_rounds 	| samples_per_round 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|--------------------	|-----------------	|--------------	|------------------	|-------------------	|-----------------------------	|--------	|
+| 0.95       	| deterministic   	| 2.0                	| deterministic   	| 1.0          	| 3300             	| 1000              	| 0                           	| 100000 	|
+
+| metric      	| mean               	| variance               	| lower_t            	| upper_t           	| precision_t           	| lower_chi2 	| upper_chi2 	| precision_chi2      	| confidence 	|
+|-------------	|--------------------	|------------------------	|--------------------	|-------------------	|-----------------------	|------------	|------------	|---------------------	|------------	|
+| T1_est_mean 	| 0.9996970614965162 	| 0.00030293850348381523 	| 0.9991030950881964 	| 1.000291027904836 	| 0.0005941463981405022 	|            	|            	|                     	| 0.95       	|
+| T1_est_var  	| 0.0                	| 0.0                    	|                    	|                   	|                       	| 0.0        	| 0.0        	| 0.04822073339236929 	| 0.95       	|
+| T2_est_mean 	| 0.9996970614965162 	| 0.00030293850348381523 	| 0.9991030950881964 	| 1.000291027904836 	| 0.0005941463981405022 	|            	|            	|                     	| 0.95       	|
+| T2_est_var  	| 0.0                	| 0.0                    	|                    	|                   	|                       	| 0.0        	| 0.0        	| 0.04822073339236929 	| 0.95       	|
+| W1_est_mean 	| 0.0                	| 0.0                    	| 0.0                	| 0.0               	| 0.0                   	|            	|            	|                     	| 0.95       	|
+| W1_est_var  	| 0.0                	| 0.0                    	| 0.0                	| 0.0               	| 0.0                   	| 0.0        	| 0.0        	| 0.04822073339236929 	| 0.95       	|
+| W2_est_mean 	| 0.0                	| 0.0                    	| 0.0                	| 0.0               	| 0.0                   	|            	|            	|                     	| 0.95       	|
+| W2_est_var  	| 0.0                	| 0.0                    	| 0.0                	| 0.0               	| 0.0                   	| 0.0        	| 0.0        	| 0.04822073339236929 	| 0.95       	|
+| X1_est_mean 	| 0.9996970614965162 	| 0.00030293850348381523 	| 0.9991030950881964 	| 1.000291027904836 	| 0.0005941463981405022 	|            	|            	|                     	| 0.95       	|
+| X1_est_var  	| 0.0                	| 0.0                    	|                    	|                   	|                       	| 0.0        	| 0.0        	| 0.04822073339236929 	| 0.95       	|
+| X2_est_mean 	| 0.9996970614965162 	| 0.00030293850348381523 	| 0.9991030950881964 	| 1.000291027904836 	| 0.0005941463981405022 	|            	|            	|                     	| 0.95       	|
+| X2_est_var  	| 0.0                	| 0.0                    	|                    	|                   	|                       	| 0.0        	| 0.0        	| 0.04822073339236929 	| 0.95       	|
+
+Como esperado, o tempo de espera e a sua variância foram nulos(com precisão de 4.8% pela $\chi^2$). O tempo total não foi exatamente igual a 1 por causa dos clientes que não tiveram sua amostra coletada por estarem fora da cor da rodada. Porém, com uma boa precisão(0.059% pela distribuição t), o valor real está contido no intervalo de confiança.
+
+2) Chegadas e serviços exponenciais, fixando $E[Nq_1] = 1$:
+
+Para que $E[Nq_1] = 1$, o valor de $\rho$ deve ser apropriado:
+
+$E[Nq_1] = 1 = \lambda E[W_1]$
+
+$\frac{\rho}{2} E[W_1] = 1$
+
+$\rho = \frac{2}{E[W_1]}$
+
+$\rho = \frac{2}{\frac{\rho_1}{1-\rho_1}}$
+
+$\rho = \frac{2}{\frac{\frac{\rho}{2}}{1-\frac{\rho}{2}}}$
+
+$\rho \frac{\frac{\rho}{2}}{1-\frac{\rho}{2}} = 2$
+
+$\rho (- \frac{2}{\rho - 2} - 1) = 2$
+
+$\rho = \sqrt{5} - 1 = 1.2360679774997896964091736687313$
+
+Rodando a simulação com esse valor para $\rho$ e um número de rodadas e coletas por rodada razoável, obtive os seguintes valores:
+
+| confidence 	| utilization_pct    	| arrival_process 	| service_process 	| service_rate 	| number_of_rounds 	| samples_per_round 	| collect_all 	| arrivals_until_steady_state 	| seed   	|
+|------------	|--------------------	|-----------------	|-----------------	|--------------	|------------------	|-------------------	|-------------	|-----------------------------	|--------	|
+| 0.95       	| 1.2360679774997898 	| exponential     	| exponential     	| 1.0          	| 200              	| 1000              	| False       	| 0                           	| 100000 	|
+
+| metric       	| mean               	| variance             	| lower_t            	| upper_t            	| precision_t         	| lower_chi2         	| upper_chi2        	| precision_chi2     	| confidence 	|
+|--------------	|--------------------	|----------------------	|--------------------	|--------------------	|---------------------	|--------------------	|-------------------	|--------------------	|------------	|
+| NQ1_est_mean 	| 1.0223135198009698 	| 0.053628265261648156 	| 0.9900226891614518 	| 1.0546043504404878 	| 0.03158603502162882 	|                    	|                   	|                    	| 0.95       	|
+
+O valor alvo está dentro do IC, com precisão de 3%.
+
+3) $Var[W_1]$ para chegadas e serviços exponenciais
+
+$Var[W_1]$ é um dos valores que podem ser obtidos analiticamente(olhar seção **Obtenção dos valores analíticos**). Quero testar se o simulador converge para esses valores com uma signficância razoável no intervalo.
+
+| confidence 	| utilization_pct 	| arrival_process 	| service_process 	| service_rate 	| number_of_rounds 	| samples_per_round 	| collect_all 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|-----------------	|-----------------	|--------------	|------------------	|-------------------	|-------------	|-----------------------------	|--------	|
+| 0.95       	| 0.2             	| exponential     	| exponential     	| 1.0          	| 200              	| 1000              	| False       	| 0                           	| 100000 	|
+
+| metric     	| mean                	| variance              	| lower_t             	| mean_analytical    	| upper_t           	| precision_t          	| lower_chi2           	| upper_chi2           	| precision_chi2     	| confidence 	|
+|------------	|---------------------	|-----------------------	|---------------------	|--------------------	|-------------------	|----------------------	|----------------------	|----------------------	|--------------------	|------------	|
+| W1_est_var 	| 0.23321915896621948 	| 0.0061345276204282035 	| 0.22229789496520694 	| 0.2345679012345679 	| 0.244140422967232 	| 0.046828331126065055 	| 0.005087400463141368 	| 0.007543717452937571 	| 0.1944655260220003 	| 0.95       	|
+
+Mesmo com um número pequeno de amostras, o intervalo de confiança pela distribuição t já contém o valor analítico. Testando para as outras taxas de utilização:
+
+| confidence 	| utilization_pct 	| arrival_process 	| service_process 	| service_rate 	| number_of_rounds 	| samples_per_round 	| collect_all 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|-----------------	|-----------------	|--------------	|------------------	|-------------------	|-------------	|-----------------------------	|--------	|
+| 0.95       	| 0.4             	| exponential     	| exponential     	| 1.0          	| 200              	| 1000              	| False       	| 0                           	| 100000 	|
+
+| metric     	| mean               	| variance             	| lower_t            	| mean_analytical 	| upper_t            	| precision_t        	| lower_chi2           	| upper_chi2           	| precision_chi2     	| confidence 	|
+|------------	|--------------------	|----------------------	|--------------------	|-----------------	|--------------------	|--------------------	|----------------------	|----------------------	|--------------------	|------------	|
+| W1_est_var 	| 0.5400784761128288 	| 0.023057594053774756 	| 0.5189051378014886 	| 0.5625          	| 0.5612518144241689 	| 0.0392041883685747 	| 0.019121800719826467 	| 0.028354257319990483 	| 0.1944655260220003 	| 0.95       	|
+
+A partir de $\rho=0.4$, foi preciso aumentar o número de amostras por rodada para 2000:
+
+| confidence 	| utilization_pct 	| arrival_process 	| service_process 	| service_rate 	| number_of_rounds 	| samples_per_round 	| collect_all 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|-----------------	|-----------------	|--------------	|------------------	|-------------------	|-------------	|-----------------------------	|--------	|
+| 0.95       	| 0.4             	| exponential     	| exponential     	| 1.0          	| 200              	| 2000              	| False       	| 0                           	| 100000 	|
+
+| metric     	| mean               	| variance             	| lower_t          	| mean_analytical 	| upper_t            	| precision_t          	| lower_chi2           	| upper_chi2           	| precision_chi2     	| confidence 	|
+|------------	|--------------------	|----------------------	|------------------	|-----------------	|--------------------	|----------------------	|----------------------	|----------------------	|--------------------	|------------	|
+| W1_est_var 	| 0.5518384454432985 	| 0.013368070041296753 	| 0.53571652778966 	| 0.5625          	| 0.5679603630969371 	| 0.029214922930365227 	| 0.011086220476525004 	| 0.016438909321527025 	| 0.1944655260220003 	| 0.95       	|
+
+Para $\rho=0.6$:
+
+| confidence 	| utilization_pct 	| arrival_process 	| service_process 	| service_rate 	| number_of_rounds 	| samples_per_round 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|-----------------	|-----------------	|--------------	|------------------	|-------------------	|-----------------------------	|--------	|
+| 0.95       	| 0.6             	| exponential     	| exponential     	| 1.0          	| 200              	| 2000              	| 0                           	| 100000 	|
+
+| metric     	| mean               	| variance            	| lower_t            	| mean_analytical    	| upper_t            	| precision_t          	| lower_chi2          	| upper_chi2          	| precision_chi2     	| confidence 	|
+|------------	|--------------------	|---------------------	|--------------------	|--------------------	|--------------------	|----------------------	|---------------------	|---------------------	|--------------------	|------------	|
+| W1_est_var 	| 1.0433874152391551 	| 0.05058689214110876 	| 1.0120255891760541 	| 1.0408163265306123 	| 1.0747492413022561 	| 0.030057700145743545 	| 0.04195201235227223 	| 0.06220743384771249 	| 0.1944655260220003 	| 0.95       	|
+
+Para $\rho=0.8$:
+
+| confidence 	| utilization_pct 	| arrival_process 	| service_process 	| service_rate 	| number_of_rounds 	| samples_per_round 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|-----------------	|-----------------	|--------------	|------------------	|-------------------	|-----------------------------	|--------	|
+| 0.95       	| 0.8             	| exponential     	| exponential     	| 1.0          	| 200              	| 2000              	| 0                           	| 100000 	|
+
+| metric     	| mean               	| variance            	| lower_t            	| mean_analytical    	| upper_t           	| precision_t        	| lower_chi2        	| upper_chi2         	| precision_chi2     	| confidence 	|
+|------------	|--------------------	|---------------------	|--------------------	|--------------------	|-------------------	|--------------------	|-------------------	|--------------------	|--------------------	|------------	|
+| W1_est_var 	| 1.7591048192846979 	| 0.15553337569379302 	| 1.7041134996799967 	| 1.7777777777777781 	| 1.814096138889399 	| 0.0312609680798113 	| 0.128984759136729 	| 0.1912616444709501 	| 0.1944655260220003 	| 0.95       	|
+
+Para $\rho=0.9$:
+
+| confidence 	| utilization_pct 	| arrival_process 	| service_process 	| service_rate 	| number_of_rounds 	| samples_per_round 	| arrivals_until_steady_state 	| seed   	|
+|------------	|-----------------	|-----------------	|-----------------	|--------------	|------------------	|-------------------	|-----------------------------	|--------	|
+| 0.95       	| 0.9             	| exponential     	| exponential     	| 1.0          	| 200              	| 2000              	| 0                           	| 100000 	|
+
+| metric     	| mean               	| variance            	| lower_t           	| mean_analytical    	| upper_t            	| precision_t         	| lower_chi2          	| upper_chi2          	| precision_chi2     	| confidence 	|
+|------------	|--------------------	|---------------------	|-------------------	|--------------------	|--------------------	|---------------------	|---------------------	|---------------------	|--------------------	|------------	|
+| W1_est_var 	| 2.3551656920552086 	| 0.40446563672113695 	| 2.266486208062589 	| 2.3057851239669422 	| 2.4438451760478284 	| 0.03765318265791922 	| 0.33542577275677016 	| 0.49737725080676537 	| 0.1944655260220003 	| 0.95       	|
+
+De forma geral, as outras métricas também se mantiveram dentro dos intervalos de confiança. Os dados para esse teste estão na pasta `files/tests/correctness/3`.
+
+4) Independência das sementes
+
+
 
 ## Obtenção dos melhores parâmetros de simulação
 
@@ -357,6 +524,10 @@ Os valores abaixo mostram a quantidade de rodadas até que todas as métricas co
 
 ## Conclusões
 
+### Aprendizados
+
+O simulador me ajuda a avaliar se um resultado que obtive analiticamente através de manipulações algébricas está certo ou errado(mencionar caso do cálculo de $E[W_2] = 1$)
+
 ### Dificuldades
 
 - Erro nunérico de ponto flutuante do Python:
@@ -370,7 +541,7 @@ Os valores abaixo mostram a quantidade de rodadas até que todas as métricas co
 
 ## Instruções para execução do simulador
 
-Para a execução, é necessário instalar a versão [versão 3.11.1 do Python](https://www.python.org/downloads/release/python-3111/)([link](https://www.python.org/downloads/release/python-3111/)).
+Para a execução, é necessário instalar a versão [versão 3.11.1 do Python - https://www.python.org/downloads/release/python-3111/](https://www.python.org/downloads/release/python-3111/).
 
 Após a instalação, para realizar o download das dependências do projeto, executar o seguinte comando abaixo a partir da pasta raiz:
 
@@ -378,4 +549,4 @@ Após a instalação, para realizar o download das dependências do projeto, exe
 
 Para executar o simulador, executar o comando a seguir a partir da pasta raiz do projeto:
 
-`python src/main.py`
+`python src/start_simulator_3.py`

@@ -1,8 +1,13 @@
 import math
 import numpy as np
 from scipy import stats
+from math import isclose
 
 def t_dist_ci(mean, variance, n, confidence):
+
+    if isclose(mean, 0, abs_tol=1e-9) and isclose(variance, 0, abs_tol=1e-9):
+        return 0.0, 0.0, 0.0
+
     std = math.sqrt(variance)        
 
     alpha = 1-confidence

@@ -4,6 +4,7 @@ import csv
 import os
 from datetime import datetime
 from models.metric_type import MetricType
+from utils.analitical_values import get_dataframe
 from utils.area_estimator import AreaEstimator
 from utils.confidence_interval_calculator import chi2_dist_ci, t_dist_ci
 from utils.data_point_estimator import DataPointEstimator
@@ -12,6 +13,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import inspect
 import json
+
+
 
 #tipos de eventos
 ARRIVAL = 'ARRIVAL'
@@ -84,7 +87,7 @@ class Simulator3:
         self.__arrivals_until_steady_state = arrivals_until_steady_state
         self.__steady_state_reached = False
 
-        self.__current_round = 1
+        self.__current_round = 0
         """Rodada atual do simulador."""
         self.__number_of_arrivals = 0
         """Número de chegadas ao sistema(na fila 1)."""
@@ -144,6 +147,9 @@ class Simulator3:
 
         self.__execution_parameters = {}
         """Parametros de execução do simulador. Utilizado para depuração."""
+
+        if(self.__service_rate != None):
+            self.__analytical_values = get_dataframe(self.__service_rate)
         
         self.record_execution_parameters()
     
@@ -247,35 +253,41 @@ class Simulator3:
             'service_time': service_time
         }
 
-        #coleta métricas relacionadas ao tempo de espera
-        if (queue == 1):
-            last_event = self.get_last_event_for_client(client, ARRIVAL, 1)
-            wait_time = self.__current_timestamp - last_event['event_timestamp']
-            self.__clients_in_system[client]['metrics'][str(
-                MetricType.W1)] += wait_time
-        elif (queue == 2 and self.__interrupted_service == None):
-            last_event = self.get_last_event_for_client(client, ARRIVAL, 2)
-            wait_time = self.__current_timestamp - last_event['event_timestamp']
-            self.__clients_in_system[client]['metrics'][str(
-                MetricType.W2)] += wait_time
-        elif (queue == 2 and self.__interrupted_service != None
-              and self.__interrupted_service['client'] == client):
-            wait_time = self.__current_timestamp - self.__interrupted_service[
-                'interruption_time']
-            self.__clients_in_system[client]['metrics'][str(
-                MetricType.W2)] += wait_time
+        #colatando amostras se o cliente for da rodada atual
+        #if(self.__clients_in_system[self.__current_service['client']]['color'] == self.__current_round):
+        if(True):
+            #coleta métricas relacionadas ao tempo de espera
+            if (queue == 1):
+                last_event = self.get_last_event_for_client(client, ARRIVAL, 1)
+                wait_time = self.__current_timestamp - last_event['event_timestamp']
+                self.__clients_in_system[client]['metrics'][str(
+                    MetricType.W1)] += wait_time
+            elif (queue == 2 and self.__interrupted_service == None):
+                last_event = self.get_last_event_for_client(client, ARRIVAL, 2)
+                wait_time = self.__current_timestamp - last_event['event_timestamp']
+                self.__clients_in_system[client]['metrics'][str(
+                    MetricType.W2)] += wait_time
+            elif (queue == 2 and self.__interrupted_service != None
+                and self.__interrupted_service['client'] == client):
+                wait_time = self.__current_timestamp - self.__interrupted_service[
+                    'interruption_time']
+                self.__clients_in_system[client]['metrics'][str(
+                    MetricType.W2)] += wait_time
 
     def remove_current_service(self, ):
-        service_client = self.__current_service['client']
-        service_queue = self.__current_service['queue']
-        start_time = self.__current_service['start_time']
+        #coletando amostras se o cliente for da rodada atual
+        #if(self.__clients_in_system[self.__current_service['client']]['color'] == self.__current_round):
+        if(True):
+            service_client = self.__current_service['client']
+            service_queue = self.__current_service['queue']
+            start_time = self.__current_service['start_time']
 
-        if (service_queue == 1):
-            self.__clients_in_system[service_client]['metrics'][str(
-                MetricType.X1)] += (self.__current_timestamp - start_time)
-        elif (service_queue == 2):
-            self.__clients_in_system[service_client]['metrics'][str(
-                MetricType.X2)] += (self.__current_timestamp - start_time)
+            if (service_queue == 1):
+                self.__clients_in_system[service_client]['metrics'][str(
+                    MetricType.X1)] += (self.__current_timestamp - start_time)
+            elif (service_queue == 2):
+                self.__clients_in_system[service_client]['metrics'][str(
+                    MetricType.X2)] += (self.__current_timestamp - start_time)
 
         self.__current_service = None
 
@@ -285,7 +297,8 @@ class Simulator3:
             'queue': queue,
             'start_time': start_time,
             'service_time': service_time,
-            'interruption_time': self.__current_timestamp
+            'interruption_time': self.__current_timestamp,
+            'remaining_time': start_time + service_time - self.__current_timestamp
         }
 
     def remove_interrupted_service(self):
@@ -429,9 +442,18 @@ class Simulator3:
         with open(simulation_metrics_file, 'a+', newline='') as output_file:
 
             fieldnames = [
-                'metric',  'mean', 'variance', 'lower_t', 'upper_t', 'precision_t',
-                'lower_chi2', 'upper_chi2', 'precision_chi2',
-                'confidence', 'rounds'
+                'metric',  
+                'mean', 
+                'variance', 
+                'lower_t',
+                'mean_analytical',
+                'upper_t', 
+                'precision_t',
+                'lower_chi2', 
+                'upper_chi2', 
+                'precision_chi2',
+                'confidence', 
+                'rounds'
             ]
 
             rows = []
@@ -441,14 +463,11 @@ class Simulator3:
                 upper = ''
                 precision = ''
 
-                nsamples = self.__metric_estimators_simulation[
-                        metric].nsamples()
+                nsamples = self.__metric_estimators_simulation[metric].nsamples()
 
-                mean = self.__metric_estimators_simulation[
-                        metric].mean()
+                mean = self.__metric_estimators_simulation[metric].mean()
                 
-                variance = self.__metric_estimators_simulation[
-                        metric].variance()
+                variance = self.__metric_estimators_simulation[metric].variance()
 
                 results = {
                     'metric': metric,
@@ -457,6 +476,7 @@ class Simulator3:
                     'mean': mean,
                     'variance': variance,
                     'lower_t': None, 
+                    'mean_analytical': None,
                     'upper_t': None, 
                     'precision_t': None,
                     'lower_chi2': None, 
@@ -476,11 +496,17 @@ class Simulator3:
                     results['lower_chi2'] = lower_chi2
                     results['upper_chi2'] = upper_chi2
                     results['precision_chi2'] = precision_chi2
+
+                    if(metric in self.__analytical_values.columns):
+                        results['mean_analytical'] = float(self.__analytical_values[self.__analytical_values['rho'] == self.__utilization_pct][metric])
                 elif (metric.endswith(MEAN_SUFFIX)):
                     lower, upper, precision = t_dist_ci(mean, variance, nsamples, self.__confidence)
                     results['lower_t'] = lower
                     results['upper_t'] = upper
                     results['precision_t'] = precision
+
+                    if(metric in self.__analytical_values.columns):
+                        results['mean_analytical'] = float(self.__analytical_values[self.__analytical_values['rho'] == self.__utilization_pct][metric])
                 elif (metric.endswith(VARIANCE_SUFFIX)):
                     lower, upper, precision = chi2_dist_ci(variance, nsamples, self.__confidence)
                     results['lower_chi2'] = lower
@@ -499,21 +525,25 @@ class Simulator3:
     def save_execution_parameters_config(self):
         signature = inspect.signature(self.__init__)
 
-        config_file: str = f'{self.__results_folder}/execution_parameters.json'
+        config_file: str = f'{self.__results_folder}/execution_parameters.csv'
         """Arquivo onde o log de eventos da simulação serão salvos"""
 
         if (os.path.exists(config_file)):
-            os.remove(config_file)
+            os.remove(config_file)        
 
         with open(config_file, 'a+', newline='') as output_file:
-            output_file.write(json.dumps(self.__execution_parameters))
+            fieldnames = list(self.__execution_parameters.keys())
+
+            dict_writer = csv.DictWriter(output_file, fieldnames=fieldnames)
+            dict_writer.writeheader()
+            dict_writer.writerows([self.__execution_parameters])
 
             self.debug_print(f'Execution paramaters config saved at {config_file}')
 
     def plot_metrics_per_round_evolution(self):
         """Gera gráficos com as a evolução das métricas coletadas na simulação."""
 
-        def plot_metric_and_save(xname: str, yname: str, mean: float):
+        def plot_metric_and_save(xname: str, yname: str, mean: float, lower: float, upper: float):
             plt.xlabel(xname)
 
             plt.plot(self.__metrics_per_round[xname],
@@ -526,6 +556,18 @@ class Simulator3:
                               self.__metrics_per_round[xname])),
                      '--',
                      color='red')
+
+            plt.plot(self.__metrics_per_round[xname],
+                     list(map(lambda x: lower,
+                              self.__metrics_per_round[xname])),
+                     '--',
+                     color='orange')
+            
+            plt.plot(self.__metrics_per_round[xname],
+                     list(map(lambda x: upper,
+                              self.__metrics_per_round[xname])),
+                     '--',
+                     color='orange')
 
             plt.title(f'{yname}_X_{xname}')
 
@@ -540,8 +582,14 @@ class Simulator3:
         for c in list(
                 filter(lambda x: not (str(x).endswith(VARIANCE_SUFFIX)),
                        MEAN_VAR_COLUMNS)):
+                                   
             mean = self.__metric_estimators_simulation[c].mean()
-            plot_metric_and_save('round', c, mean)
+            variance = self.__metric_estimators_simulation[c].variance()
+            nsamples = self.__metric_estimators_simulation[c].nsamples()
+
+            lower, upper, _ = t_dist_ci(mean, variance, nsamples, self.__confidence)
+
+            plot_metric_and_save('round', c, mean, lower, upper)
 
         self.debug_print('Metric plots saved.')
 
@@ -608,12 +656,18 @@ class Simulator3:
             O id do cliente."""
 
         x1 = self.__clients_in_system[client]['metrics'][str(MetricType.X1)]
+
+        print(f'client {client}, effective service time queue 1: {x1}')
+
         w1 = self.__clients_in_system[client]['metrics'][str(MetricType.W1)]
 
         #consolidando os valores de T1 e T2 para o cliente
         self.__clients_in_system[client]['metrics'][str(MetricType.T1)] = x1 + w1
 
         x2 = self.__clients_in_system[client]['metrics'][str(MetricType.X2)]
+
+        print(f'client {client}, effective service time queue 2: {x2}')
+
         w2 = self.__clients_in_system[client]['metrics'][str(MetricType.W2)]
 
         self.__clients_in_system[client]['metrics'][str(MetricType.T2)] = x2 + w2
@@ -647,6 +701,9 @@ class Simulator3:
                 if (self.__current_service == None):
                     service_time = self.get_service_time()
                     self.set_current_service(event_client, 1, service_time)
+                    
+                    print(f'client {event_client}, service time queue 1: {service_time}')
+
                     self.insert_event(DEPARTURE, 1,
                                     self.__current_timestamp + service_time,
                                     event_client)
@@ -688,7 +745,8 @@ class Simulator3:
 
             self.__number_of_arrivals += 1
 
-            if(self.__steady_state_reached == False and self.__number_of_arrivals == self.__arrivals_until_steady_state):
+            if(self.__steady_state_reached == False and 
+                (self.__number_of_arrivals == self.__arrivals_until_steady_state or self.__number_of_arrivals == self.__arrivals_until_steady_state + 1)):
                 self.__steady_state_reached = True
                 self.advance_round()
             elif (self.__number_of_arrivals >=
@@ -704,6 +762,7 @@ class Simulator3:
             #cliente recém chegado a fila 2 inicia o seu serviço e tem sua partida da fila 2 agendada
             if(len(self.__waiting_qs[0]) == 0 and len(self.__waiting_qs[1]) == 0 and self.__current_service == None):
                 service_time = self.get_service_time()
+                print(f'client {event_client}, service time queue 2: {service_time}')
                 self.set_current_service(event_client, 2, service_time)
                 self.insert_event(DEPARTURE, 2,
                                   self.__current_timestamp + service_time,
@@ -723,6 +782,9 @@ class Simulator3:
             if (len(self.__waiting_qs[0]) > 0):
                 next_client_id = self.pop_from_waiting_queue(1)
                 service_time = self.get_service_time()
+
+                print(f'client {next_client_id}, service time queue 1: {service_time}')
+
                 self.set_current_service(next_client_id, 1, service_time)
                 self.insert_event(DEPARTURE, 1,
                                   self.__current_timestamp + service_time,
@@ -735,13 +797,12 @@ class Simulator3:
                 if (self.__interrupted_service != None
                         and self.__interrupted_service['client']
                         == next_client_id):
-                    service_time = self.__interrupted_service[
-                        'start_time'] + self.__interrupted_service[
-                            'service_time'] - self.__interrupted_service[
-                                'interruption_time']
+                    service_time = self.__interrupted_service['remaining_time']
                     remove_interrumpted_service = True
                 else:
                     service_time = self.get_service_time()
+                    
+                    print(f'client {next_client_id}, service time queue 2: {service_time}')
 
                 self.set_current_service(next_client_id, 2, service_time)
 
@@ -767,6 +828,9 @@ class Simulator3:
             if (len(self.__waiting_qs[0]) > 0):
                 next_client_id = self.pop_from_waiting_queue(1)
                 service_time = self.get_service_time()
+
+                print(f'client {next_client_id}, service time queue 1: {service_time}')
+                
                 self.set_current_service(next_client_id, 1, service_time)
                 self.insert_event(DEPARTURE, 1,
                                   self.__current_timestamp + service_time,

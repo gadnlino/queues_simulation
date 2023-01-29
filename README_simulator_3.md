@@ -222,7 +222,7 @@ $k=5000$:
 | W1_est_var   	| 0.2344546942516595   	| 0.0011662239209602437  	| 0.23328929262758005  	| 0.2345679012345679   	| 0.23562009587573893  	| 0.004970690084918971  	|
 | W2_est_mean** 	| 0.5272908391023556   	| 0.0010462876123667822  	| 0.5261869887817505   	| 0.38888888888888884  	| 0.5283946894229608   	| 0.0020934373191163888 	|
 
-Alterando a seed:
+$k=1000$, $\rho = 0.4$:
 
 ### Número de rodadas
 
@@ -345,20 +345,14 @@ Os valores abaixo mostram a quantidade de rodadas até que todas as métricas co
 
 ### Dificuldades
 
-- Erro número do Python:
+- Erro nunérico de ponto flutuante do Python:
     Ao calcula o tempo de serviço restante do cliente pertencente a fila 2, as operações aritméticas resultavam em um erro numérico, que fazia com o que o tempo de serviço resultante(considerando todas as interrupções) fosse ligeiramente maior do que o obtido inicialmente para o cliente. Por exemplo:
 
-    client 4, service time queue 2: 0.5497878190747206
+    client 4, service time queue 2: 0.5497878190747206 | client 4, effective service time queue 2: 0.549787819074723
 
-    client 4, effective service time queue 2: 0.549787819074723
-
-    client 5, service time queue 2: 0.5181251288306629
-    
-    client 5, effective service time queue 2: 0.5181251288306612
+    client 5, service time queue 2: 0.5181251288306629 | client 5, effective service time queue 2: 0.5181251288306612
 
     Solução: Decimal?(https://docs.python.org/3/library/decimal.html#module-decimal)
-
-
 
 ## Instruções para execução do simulador
 

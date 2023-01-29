@@ -121,7 +121,7 @@ if (__name__ == '__main__'):
     rho_values = [.2, .4, .6, .8, .9]
 
     print(
-        f'rho, mu , E_W1 , Var_W1 , E_NQ1 , E_T1 , E_N1 , E_W2 , E_NQ2 , E_T2 , E_N2'
+        f'rho, mu , E_W1 , Var_W1 , E_NQ1 , E_T1 , E_N1 , E_W2 , E_NQ2 , E_T2 , E_N2, E_T'
     )
 
     for rho in rho_values:
@@ -137,6 +137,8 @@ if (__name__ == '__main__'):
         e_t2 = E_T2(rho, mu)
         e_n2 = E_N2(rho, mu)
 
+        e_t = E_T(rho, mu)
+
         print(
-            f'{rho}, {mu}, {e_w1}, {var_w1},  {e_nq1}, {e_t1}, {e_n1},  {e_w2},  {e_nq2}, {e_t2}, {e_n2}'
+            f'{rho}, {mu}, {e_w1}, {var_w1},  {e_nq1}, {e_t1}, {e_n1},  {e_w2},  {e_nq2}, {e_t2}, {e_n2}, {e_t}'
         )

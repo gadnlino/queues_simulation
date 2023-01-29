@@ -20,7 +20,6 @@ def E_T(rho, mu):
 def E_X(rho, mu):
     return 1 / mu
 
-
 def E_W1(rho, mu):
     lbd = get_lambda(rho)
 
@@ -52,13 +51,20 @@ def E_N1(rho, mu):
     return lbd * E_T1(rho, mu)
 
 
-def E_T2(rho, mu):
-    return E_T(rho, mu) - E_T1(rho, mu)
+# def E_T2(rho, mu):
+#     return E_T(rho, mu) - E_T1(rho, mu)
 
+def E_T2(rho, mu):
+    lbd = get_lambda(rho)
+
+    rho_1 = lbd / mu
+
+    rho_2 = rho - rho_1
+
+    return (rho*(1-rho_1)*E_W1(rho, mu) + rho_2*E_X(rho, mu) + rho_1*(1-rho)* E_X(rho, mu) + (1-rho_2)*E_X(rho, mu))/((1-rho_1)*(1-rho))
 
 def E_W2(rho, mu):
     return E_T2(rho, mu) - E_X(rho, mu)
-
 
 def E_N2(rho, mu):
     lbd = get_lambda(rho)

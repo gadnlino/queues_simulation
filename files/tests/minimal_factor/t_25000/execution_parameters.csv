@@ -1,0 +1,2 @@
+confidence,utilization_pct,arrival_process,inter_arrival_time,service_process,service_rate,service_time,number_of_rounds,samples_per_round,collect_all,arrivals_until_steady_state,predefined_system_arrival_times,seed,simulation_time
+0.95,0.6,exponential,,exponential,1.0,,3300,1000,False,25000,,100000,133.36272311210632

@@ -912,6 +912,8 @@ class Simulator3:
 
         self.debug_print(f'Total simulation time = {total} s')
 
+        self.__execution_parameters['simulation_time'] = total
+
         self.calculate_covariance()
 
         os.mkdir(self.__results_folder)

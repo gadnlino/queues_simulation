@@ -103,12 +103,9 @@ Quando há o final da rodada, é obtido os valores de $X_i$, com a média e a va
 Ao final da execução, o simulador salva os arquivos para análise das métricas na pasta `results_{timestamp}_simulator3`. Estes são:
 
 - Arquivos .png(exemplo: `W1_est_mean_X_round.png`) com os valores médios de cada uma das métricas, a cada rodada;
-- `simulation_metrics.csv`: onde são armazenados os resultados finais(média, variância, intervalos de confiança) de cada uma das métricas.
-    As colunas do arquivo representam:
-- `execution_parameters.csv`: os parâmetros utilizados para a simulação.
-    As colunas do arquivo representam:
-    - mean: $\mu$ amostral
-    - variance: $\sigma^2$ amostral
+- `simulation_metrics.csv`: onde são armazenados os resultados finais(média, variância, intervalos de confiança) de cada uma das métricas. As colunas do arquivo representam:
+    - mean: $\hat{\mu}$
+    - variance: $\hat{\sigma}^2$
     - lower_t: $t_{\alpha/2}$
     - mean_analytical: $\mu$
     - upper_t: $t_{1 - \alpha/2}$
@@ -117,8 +114,22 @@ Ao final da execução, o simulador salva os arquivos para análise das métrica
     - upper_chi2: ${\chi^2}_{1-\alpha/2}$
     - rounds: $n$, número de rodadas
     - confidence: $ 1- \alpha$
-    - mean_cov: $\frac{Cov(X_1, X_2) + ... + Cov(X_{n-1}, X_n)}{n}$
-    - mean_cov_var: $\frac{\frac{Cov(X_1, X_2) + ... + Cov(X_{n-1}, X_n)}{n}}{\sigma^2}$
+    - mean_cov: $\frac{Cov(X_1, X_2) + ... + Cov(X_{n-1}, X_n)}{n}$, a média da covâriancia entre rodadas da simulação
+    - mean_cov_var: $\frac{\frac{Cov(X_1, X_2) + ... + Cov(X_{n-1}, X_n)}{n}}{\sigma^2}$, a razão entre a média da covariância entre rodadas da simulação, e a variância obtida para a métrica especificada.
+- `execution_parameters.csv`: os parâmetros utilizados para a simulação. As colunas do arquivo representam:
+   - confidence: $ 1- \alpha$
+   - utilization_pct: $\rho$, a taxa de utilização do sistema
+   - arrival_process: processo de chegada
+   - inter_arrival_time: tempo entre chegadas(somente para processo de chegada determinístico).
+   - service_process: processo de realização dos serviços no sistema
+   - service_rate: $\mu$, a taxa de serviço.
+   - service_time: o tempo de serviço(somente para processo de serviço determinístico).
+   - number_of_rounds: $n$, o número de rodadas da simulação.
+   - samples_per_round: $k$, o número de amostras em cada rodada da simulação.
+   - arrivals_until_steady_state: $t$, o número de chegadas desprezadas na fase transiente.
+   - predefined_system_arrival_times: tempos de chegadas pré-determindos, informados na inicialização do simulador.
+   - seed: $s$, a seed utilizada na simulação.
+   - simulation_time: o tempo total de simulação.
 - `metric_per_round_evolution.csv`: evolução das métricas, rodada a rodada. É a representação tabular dos dados apresentados nos arquivos .png .
 - `event_log_raw.csv`: Lista com todos os eventos tratados na simulação.
 

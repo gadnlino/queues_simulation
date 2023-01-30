@@ -8,7 +8,7 @@
 
 A implementação foi realizada em Python 3. As instruções para a execução do simulador estão ne seção **Instruções para execução do simulador**.
 
-O ponto inicial é o arquivo `main.py`, onde é criado uma instância do o simulador(classe Simulator3), com os parâmetros apropriados. No construtor da classe, são iniciadas as variáveis de controle e parametrizações do simulador(detalhados mais adiante). Em seguida, inicia-se a execução do simulador, chamando o método `run()`.
+O ponto inicial é o arquivo `start_simulator_3.py`, onde é criado uma instância do o simulador(classe Simulator3), com os parâmetros apropriados. No construtor da classe, são iniciadas as variáveis de controle e parametrizações do simulador(detalhados mais adiante). Em seguida, inicia-se a execução do simulador, chamando o método `run()`.
 
 A execução do simulador é da seguinte forma:
 
@@ -104,7 +104,21 @@ Ao final da execução, o simulador salva os arquivos para análise das métrica
 
 - Arquivos .png(exemplo: `W1_est_mean_X_round.png`) com os valores médios de cada uma das métricas, a cada rodada;
 - `simulation_metrics.csv`: onde são armazenados os resultados finais(média, variância, intervalos de confiança) de cada uma das métricas.
+    As colunas do arquivo representam:
 - `execution_parameters.csv`: os parâmetros utilizados para a simulação.
+    As colunas do arquivo representam:
+    - mean: $\mu$ amostral
+    - variance: $\sigma^2$ amostral
+    - lower_t: $t_{\alpha/2}$
+    - mean_analytical: $\mu$
+    - upper_t: $t_{1 - \alpha/2}$
+    - precision_t: 
+    - lower_chi2: ${\chi^2}_{\alpha/2}$
+    - upper_chi2: ${\chi^2}_{1-\alpha/2}$
+    - rounds: $n$, número de rodadas
+    - confidence: $ 1- \alpha$
+    - mean_cov: $\frac{Cov(X_1, X_2) + ... + Cov(X_{n-1}, X_n)}{n}$
+    - mean_cov_var: $\frac{\frac{Cov(X_1, X_2) + ... + Cov(X_{n-1}, X_n)}{n}}{\sigma^2}$
 - `metric_per_round_evolution.csv`: evolução das métricas, rodada a rodada. É a representação tabular dos dados apresentados nos arquivos .png .
 - `event_log_raw.csv`: Lista com todos os eventos tratados na simulação.
 

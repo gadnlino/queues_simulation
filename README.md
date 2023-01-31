@@ -1,6 +1,9 @@
 # Trabalho de simulação - Teoria de Filas
 #### Guilherme Avelino do Nascimento - DRE 117078497
-#### Link para o repositório no GitHub: https://github.com/gadnlino/queues_simulation/blob/simulator3/README_simulator_3.md
+#### Link para o repositório no GitHub: 
+
+https://github.com/gadnlino/queues_simulation/tree/simulator3
+
 #### Observação: no relatório impresso, algumas tabelas podem ter ficado mal formatadas devido do PDF a partir desse arquivo README. Todos os resultados numéricos foram truncados para 3 casas decimais a fim de melhorar a apresentação. Em caso de qualquer dúvida, recomenda-se consultar a versão do README disponível online no GitHub, pelo link acima.
 ## Introdução
 
